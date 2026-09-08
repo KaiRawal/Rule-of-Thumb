@@ -4,6 +4,11 @@ build:
   os: ubuntu-24.04
   tools:
     python: "3.10"
+  jobs:
+    # Stage the canonical examples/ notebooks where the toctree expects
+    # them (docs-src/notebooks/ is gitignored); myst-nb executes them.
+    pre_build:
+      - mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/
 
 sphinx:
   configuration: docs-src/conf.py
