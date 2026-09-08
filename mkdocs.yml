@@ -1,0 +1,47 @@
+site_name: ruleofthumb
+site_description: "Rule of Thumb: explaining AI systems using partial information (experimental 0.0.x)"
+site_url: "https://KaiRawal.github.io/Rule-of-Thumb/"
+repo_url: "https://github.com/KaiRawal/Rule-of-Thumb"
+
+# Docs source lives in docs-src/; the built site is committed to docs/
+# (GitHub Pages serves this branch's /docs folder).
+docs_dir: docs-src
+site_dir: docs
+
+theme:
+  name: material
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+  - mkdocs-jupyter:
+      execute: true
+      include_source: true
+      # api.md holds mkdocstrings `:::` directives, which jupytext (run by
+      # this plugin on every .md page) misreads as unclosed MyST Divs and
+      # warns about on stderr, breaking `mkdocs build --strict`. Excluding
+      # it is safe: only .ipynb pages need this plugin. Any future page
+      # containing `:::` directives needs adding here too.
+      ignore: ["api.md"]
+  - include-markdown
+
+validation:
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Tabular: tabular.md
+  - Text: text.md
+  - Image: image.md
+  - Workflows: workflows.md
+  - Notebooks:
+    - Tabular quickstart: notebooks/01_tabular_quickstart.ipynb
+    - Text quickstart: notebooks/02_text_quickstart.ipynb
+    - Image quickstart: notebooks/03_image_quickstart.ipynb
+  - Migration: migration.md
+  - Capacity: capacity.md
+  - API: api.md
+  - Test report: test-report.md

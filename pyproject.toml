@@ -1,0 +1,60 @@
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13"]
+build-backend = "uv_build"
+
+[project]
+name = "ruleofthumb"
+version = "0.0.1"
+description = "Rule of Thumb: explaining AI systems using partial information (experimental 0.0.x)"
+readme = "README.md"
+license-files = ["LICENSE*"]
+authors = [{ name = "RoT authors" }]
+requires-python = ">=3.9"
+keywords = ["explainability", "interpretability", "machine-learning", "rule-of-thumb"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.21",
+    "torch>=1.13",
+    "torchvision>=0.14",
+    "transformers>=4.30",
+    "matplotlib>=3.5",
+    "seaborn>=0.12",
+    "wordcloud>=1.9",
+    "Pillow>=9.0",
+    "shap>=0.45",
+]
+
+[project.urls]
+Homepage = "https://github.com/KaiRawal/Rule-of-Thumb"
+Repository = "https://github.com/KaiRawal/Rule-of-Thumb"
+Issues = "https://github.com/KaiRawal/Rule-of-Thumb/issues"
+Documentation = "https://KaiRawal.github.io/Rule-of-Thumb/"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+    "jupyter>=1.0",
+    "scikit-learn>=1.3",
+    "pandas>=2.0",
+]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocstrings[python]>=0.28",
+    "mkdocs-material>=9.0",
+    "mkdocs-jupyter>=0.25",
+    "mkdocs-include-markdown-plugin>=6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"

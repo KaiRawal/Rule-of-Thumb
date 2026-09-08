@@ -1,0 +1,134 @@
+{
+  "files": {
+    "breast_cancer_lr.joblib": {
+      "sha256": "e8a833af345f2eda5c8218fead9fbb55437db741680381e32ab546bf8b1749c8"
+    },
+    "cnn_binary.pt": {
+      "sha256": "385d1e96add38292e60f43c4013337bc3ce3e0eee51ec6f60fd64a90ea22008d"
+    },
+    "cnn_multiclass.pt": {
+      "sha256": "9d19b31665030edeacc37a3699f6b2bf9f8df499389d608177e5947feb8db92f"
+    },
+    "cnn_multiclass_coords.pt": {
+      "sha256": "c68e23a4d2f1d8c478e79a9a7a20e35513727103be08011c70600a9e19051de4"
+    },
+    "compas.npz": {
+      "sha256": "63e4bc868d4d9e2d5078b6cf24db6066993b96907b259423d14c030b90d59188",
+      "shapes": {
+        "x": [
+          800,
+          12
+        ],
+        "y_gbm": [
+          800
+        ],
+        "y_mlp": [
+          800
+        ],
+        "y_svc": [
+          800
+        ]
+      }
+    },
+    "compas_models.joblib": {
+      "sha256": "44113143196f6e781434fc901b4dcc340a405bcd3ef99335d75afbeb28cee30a"
+    },
+    "digits_image.npz": {
+      "sha256": "db45d2c461672bcaf2240a6dcda818d3247633a6a29b4c102d84d6a8d52b7ebb",
+      "shapes": {
+        "x_bin": [
+          120,
+          1,
+          8,
+          8
+        ],
+        "x_coords": [
+          500,
+          3,
+          8,
+          8
+        ],
+        "x_multi": [
+          500,
+          1,
+          8,
+          8
+        ],
+        "y_binary": [
+          500
+        ],
+        "y_multi": [
+          500
+        ]
+      }
+    },
+    "digits_rf.joblib": {
+      "sha256": "bba973d23330b2e1a50403eb27dd0b60055d410412520b696153c5839ec325e1"
+    },
+    "digits_tabular.npz": {
+      "sha256": "a0087a25d7f29fb9ef9ac891b3553eea0050ec6017ff3dd9bafc93672a7e048c",
+      "shapes": {
+        "x": [
+          500,
+          64
+        ],
+        "y": [
+          500
+        ]
+      }
+    },
+    "pet_reference_explanations.npz": {
+      "sha256": "dfce2da48483362cea30e4eea2592154146adf1d224f6ca8ec3fc9f0ee5de06e",
+      "shapes": {
+        "heatmaps": [
+          20,
+          7,
+          7
+        ]
+      }
+    },
+    "pets_labels.csv": {
+      "sha256": "d4ebee4a32e2509df067d9d09e7a0278dbe609737b5582fe5fbb759f1e0ac7b7"
+    },
+    "reviews.txt": {
+      "sha256": "8c6ffd6dd021e793fec76b6f7ca5ef0b53ca3ac4be03a5ae5ddd5c4f3c0ff97b"
+    },
+    "tabular_binary.npz": {
+      "sha256": "af9b02db6e20d09dae2228d51b6e56d8d3fbcc9c402a13648dde7995b64d2432",
+      "shapes": {
+        "x": [
+          569,
+          30
+        ],
+        "y": [
+          569
+        ]
+      }
+    },
+    "wine.npz": {
+      "sha256": "2df489112352b758d2694169fcdf432bf2c4e0202c63d7803950ebe142b65235",
+      "shapes": {
+        "x": [
+          178,
+          13
+        ],
+        "y_gbm": [
+          178
+        ],
+        "y_mlp": [
+          178
+        ],
+        "y_svc": [
+          178
+        ]
+      }
+    },
+    "wine_models.joblib": {
+      "sha256": "c7b488a368fe4575d1ba055e31425458abc458e1d91a8463ceab5bc882ee4fe3"
+    }
+  },
+  "numpy": "2.2.6",
+  "python": "3.10.0",
+  "sklearn": "1.7.2",
+  "torch": "2.13.0"
+}
