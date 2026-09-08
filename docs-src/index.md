@@ -45,6 +45,8 @@ pytest
   guidance. Read this before trusting an explanation.
 - [Test report](test-report.md) — the maintained test-suite report.
 
+(symbol-index)=
+
 ## Symbol index
 
 Every public symbol, each rendered on the [API reference](api.md):
@@ -84,3 +86,22 @@ re-executed on every site build under *Notebooks*:
 ## Licence
 
 MIT — see `LICENSE`. Note the experimental caveat above still applies.
+
+```{toctree}
+:hidden:
+:maxdepth: 2
+:caption: Contents
+
+quickstart
+tabular
+text
+image
+workflows
+notebooks/01_tabular_quickstart
+notebooks/02_text_quickstart
+notebooks/03_image_quickstart
+migration
+capacity
+api
+test-report
+```

@@ -19,7 +19,7 @@ importances = exp.get_explanation(X_train)  # signed, shape [N, d]
 
 `fit` auto-detects 2-D inputs as tabular; `fit_tabular` is the explicit
 equivalent. Both accept `n_classes=`, `seed=`, `pretrain_epochs=`,
-`weight_decay=` and `device=`; see [API](api.md#ruleofthumb.fit_tabular).
+`weight_decay=` and `device=`; see {py:func}`ruleofthumb.fit_tabular`.
 
 ## Reveal pipeline
 
@@ -28,7 +28,7 @@ equivalent. Both accept `n_classes=`, `seed=`, `pretrain_epochs=`,
 `score_ordering` summarises fidelity along the curve (default: per-step
 accuracy; `return_confusion=True` gives per-step K×K counts). Tabular is
 unaffected by the `granularity=` setting (one step per feature; see
-[Workflows](workflows.md#reveal-curves)).
+{ref}`Workflows: reveal curves <reveal-curves>`).
 
 ## Worked notebook
 
@@ -41,6 +41,6 @@ a toy black box on synthetic data, surrogate fit, and importance inspection.
 
 - Cross-cutting topics (tuning, persistence, non-linear shapes, plotting,
   devices): [Workflows](workflows.md).
-- Raw model control (`RoT`, `score`, `importance`): [API](api.md#ruleofthumb.core.RoT).
+- Raw model control (`RoT`, `score`, `importance`): {py:class}`ruleofthumb.core.RoT`.
 - Capacity limits are modest here — the pooled-capacity caveat in
   [Capacity](capacity.md) applies to text and images.

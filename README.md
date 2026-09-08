@@ -7,7 +7,7 @@
 
 Rule of Thumb (RoT): explaining AI systems using partial information.
 
-Documentation: https://KaiRawal.github.io/Rule-of-Thumb/ — full guides live in `docs-src/` (`mkdocs.yml`), built with `pip install -e ".[docs]" && mkdocs build --strict`.
+Documentation: https://ruleofthumb.readthedocs.io/ — full guides live in `docs-src/` (Sphinx + MyST, `docs-src/conf.py`); the API reference is rendered from docstrings and the notebooks are re-executed on every docs build.
 
 RoT trains a simple, transparent surrogate ("rule of thumb") on partial
 observations of a black-box model's behaviour. The surrogate attributes the
@@ -54,11 +54,12 @@ pytest
 ```
 
 To build the docs site locally (from the repo root, one command — stages
-the `examples/` notebooks under `docs-src/notebooks/` (gitignored), executes
-them, and validates links):
+the `examples/` notebooks under `docs-src/notebooks/` (gitignored),
+re-executes them, and validates links; output goes to a temp dir, nothing
+is committed):
 
 ```bash
-pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && mkdocs build --strict
+pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && sphinx-build -W docs-src /tmp/rot-site
 ```
 
 ## Usage

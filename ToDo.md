@@ -67,11 +67,11 @@ are provenance notes only; the legacy code did not move with the package.
   from hatchling to `uv_build`; package metadata completed (`LICENSE`
   vendored, `license-files`, `project.urls` incl. Documentation,
   `Development Status :: 1 - Planning`, `[docs]` extra). Full
-  documentation website (closes item 19): modality guides with executed
-  notebooks, workflows, migration notes, capacity guidance, per-module API
-  reference, and the test-suite report — built with one command
-  (`mkdocs build --strict`), published manually (no CI per deferred item
-  17, no version selector yet). Type annotations added to the five public
+   documentation website (closes item 19): modality guides with executed
+   notebooks, workflows, migration notes, capacity guidance, per-module API
+   reference, and the test-suite report — built with one command
+   (`sphinx-build -W`), hosted on ReadTheDocs (versions + previews; no CI
+   per deferred item 17). Type annotations added to the five public
   functions griffe flagged (`embed_texts`, `autotune`, `load_images`,
   `load_explainer`, `plot.saliency`); behaviour unchanged. No behaviour change.
 - **v0.2.19** — opt-in non-linear additive explanations: every factory and

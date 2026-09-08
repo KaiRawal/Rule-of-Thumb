@@ -60,7 +60,7 @@ Migrating a legacy `-1`-padded array? Rebuild its mask in one line with
 One reveal step covers a whole **token** (embedding dims revealed together).
 Pass `granularity="element"` to `get_order`, `ordered_predict` and
 `score_ordering` for per-element curves — the value must match how the
-order was produced. Details: [Workflows](workflows.md#reveal-curves).
+order was produced. Details: {ref}`Workflows: reveal curves <reveal-curves>`.
 
 ## Worked notebook
 
@@ -72,4 +72,4 @@ The executed hello-world is
 
 - Word order is invisible to the surrogate (token-mean pooling) — read
   [Capacity](capacity.md) before trusting an explanation.
-- Token plots and word clouds: [Workflows](workflows.md#plotting).
+- Token plots and word clouds: {ref}`Workflows: plotting <plotting>`.

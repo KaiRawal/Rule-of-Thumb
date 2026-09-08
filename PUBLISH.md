@@ -1,4 +1,4 @@
-# Publishing `ruleofthumb` v0.0.1 to PyPI (+ docs to Pages)
+# Publishing `ruleofthumb` v0.0.1 to PyPI (+ docs on ReadTheDocs)
 
 > ⚠️ Experimental 0.0.x pre-alpha — entirely vibe-coded from hand-written
 > research code. May break; backwards-incompatible changes expected.
@@ -13,6 +13,7 @@ run. Do not commit from automation; review `git status` first.
   `$PYPI_TOKEN`; for the dry run, a TestPyPI token as `$TEST_PYPI_TOKEN`.
 - `uv` installed (this repo uses the `uv_build` backend; `uv build` is
   the only supported build command).
+- ReadTheDocs account with this repo connected (one-time setup, see §5).
 - Clean tree on `main`.
 - Version pinned in all three places: `pyproject.toml`,
   `src/ruleofthumb/__init__.py`, `tests/test_explain.py` (all `0.0.1`).
@@ -33,11 +34,12 @@ one wheel, import prints `0.0.1`. Delete and rebuild `dist/` if stale
 artifacts linger (`rm -rf dist/ && uv build`).
 
 Docs build (one command, venv only — stages the `examples/` notebooks as
-generated copies under `docs-src/notebooks/`, re-executes them, validates
-links, writes the committed site to `docs/`):
+generated copies under `docs-src/notebooks/`, re-executes them with the
+execution cache, validates links; output goes to a throwaway dir, nothing
+is committed):
 
 ```bash
-.venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/mkdocs build --strict && touch docs/.nojekyll
+.venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site
 ```
 
 ## 2. Dry run: TestPyPI
@@ -76,48 +78,84 @@ git push origin main --tags
 Open the release notes from the tag, pasting the `ToDo.md`
 `v0.0.1` changelog entry.
 
-## 5. Docs to GitHub Pages (manual, one time setup + per release)
+## 5. Docs on ReadTheDocs (one-time setup, then automatic)
 
-No CI workflows in this repo (deferred with ToDo item 17) — deploy by
-hand from the repo root. The built site in `docs/` is committed; Pages
-serves this branch's `/docs` folder.
+No built HTML is ever committed — RTD builds the site itself from
+`docs-src/` + `.readthedocs.yaml` on every push and tag. No CI workflows
+in this repo (deferred with ToDo item 17); RTD's own builder is the only
+automation.
+
+One-time setup (in the RTD dashboard):
+
+1. `Import a Project` → connect `KaiRawal/Rule-of-Thumb`.
+2. Confirm the build config is picked up (`.readthedocs.yaml`: Python
+   3.10, `requirements.txt`, `pip install .`, Sphinx at
+   `docs-src/conf.py`).
+3. First build runs automatically; confirm the site renders at
+   `https://ruleofthumb.readthedocs.io/` — Home, Guides, executed
+   Notebooks, Migration, Capacity, API, Test report.
+4. Under `Admin → Versions`, activate the `v0.0.1` tag build so
+   `stable` tracks the release; `latest` tracks `main`.
+
+Per release, nothing docs-specific is required: pushing the tag rebuilds
+`stable` automatically. To preview doc changes before release, open a PR —
+RTD builds PR previews.
+
+Local preview (same one-command build as §1, then serve the output):
 
 ```bash
-# 1. One-command site build (notebooks staged + executed, links validated):
-.venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/mkdocs build --strict && touch docs/.nojekyll
-# 2. Sanity-check the output locally:
-.venv/bin/mkdocs serve   # browse http://127.0.0.1:8000 — Home, Guides,
-                         # executed Notebooks, Migration, Capacity, API, Test report
-# 3. Commit the rebuilt site and push:
-git add docs docs-src mkdocs.yml
-git commit -m "docs: rebuild site for v0.0.1"
-git push origin main
+.venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site && .venv/bin/python -m http.server -d /tmp/rot-site 8000
 ```
-
-Then enable Pages (`Settings → Pages → Deploy from a branch → main` →
-`/docs`), and confirm the served URL matches `[project.urls]
-Documentation` in `pyproject.toml`.
 
 Notes:
 
-- Expected build noise (safe to ignore): `[IPKernelApp] WARNING | Kernel
-  is running over TCP...` lines from notebook execution, and the red
-  "Material for MkDocs" banner about MkDocs 2.0 (upstream notice, not a
-  build warning). `mkdocs build --strict` still fails on any real warning
-  — a green build ends with `Documentation built`.
+- `sphinx-build -W` turns warnings into errors — fix the flagged
+  link/docstring, never drop `-W`. A separate `sphinx-build -b linkcheck`
+  run catches external-link rot.
 - `docs-src/notebooks/` are gitignored generated copies — never commit
-  them. The canonical notebooks live in `examples/`; the built HTML in
-  `docs/` (plus `docs/.nojekyll`) is committed.
-- Re-run the one-command build and commit `docs/` before each release so
-  the executed notebooks and the included `tests/TEST_SUITE.md` report
-  stay fresh.
+  them. The canonical notebooks live in `examples/`; notebook outputs are
+  cached in `.jupyter_cache/` (also gitignored) so rebuilds only re-run
+  changed notebooks.
+- Expected build noise (safe to ignore): `[IPKernelApp] WARNING | Kernel
+  is running over TCP...` lines from notebook execution. A green build
+  ends with `build succeeded`.
 
-## 6. After the release
+## 6. Managing upgrades
 
-- Yank/re-publish only if the wheel is broken (`yank`, never reuse
-  `0.0.1` — bump to `0.0.2`).
-- Next version: bump all three version sites, add a `ToDo.md` changelog
-  entry newest-first, rebuild + commit docs.
+### New package version (e.g. `0.0.2`)
+
+1. Make the behaviour change; update README (usage + migration notes).
+2. Bump all three version sites: `pyproject.toml`,
+   `src/ruleofthumb/__init__.py`, the assertion in
+   `tests/test_explain.py`.
+3. Add a `ToDo.md` changelog entry newest-first (directly under
+   `## Changelog`), describing the change and any legacy departure.
+4. Re-run §1 (pytest, ruff, `uv build`, docs build to `/tmp/rot-site`).
+5. Publish via §§2–4; RTD rebuilds `stable` from the new tag on its own.
+
+### Dependency upgrades
+
+`requirements.txt` pins the exact tested environment; `pyproject.toml`
+carries only lower bounds. To upgrade a dependency:
+
+```bash
+python -m venv /tmp/rot-upgrade --clear   # scratch env, never the repo .venv
+/tmp/rot-upgrade/bin/pip install -r requirements.txt
+/tmp/rot-upgrade/bin/pip install -U <package>          # or -U --all-targets? no: one at a time
+.venv/bin/python -m pytest   # in the repo venv after applying: see below
+```
+
+Concretely: bump the pin in `requirements.txt`, reinstall the repo venv
+(`uv pip install --python .venv/bin/python -r requirements.txt`), run the
+full §1 verification, and commit `requirements.txt` (+ `pyproject.toml`
+bounds if the upgrade needs a new minimum). One dependency per commit so
+bisects stay useful. Never reuse a published version number after a
+dependency change — if `0.0.1` is already on PyPI, the upgrade ships as
+`0.0.2` per §6 above.
+
+Docs-stack upgrades (`sphinx`, `myst-nb`, `pydata-sphinx-theme`,
+`sphinx-copybutton`) follow the same flow, verified by the §1 docs build
+instead of pytest; then confirm the RTD `latest` build for the push.
 
 ## 7. If something fails
 
@@ -126,6 +164,7 @@ Notes:
 | `uv build` errors on backend | Check `[build-system]` = `uv_build>=0.12.10,<0.13` / `uv_build`; run with `RUST_LOG=uv=debug uv build`. |
 | Sdist missing `LICENSE`/`README` | Check `license-files = ["LICENSE*"]` and `readme = "README.md"`; `LICENSE` must sit next to `pyproject.toml`. |
 | `uv publish` 403 | Token scope (project vs account), or name taken — confirm `pypi.org/p/ruleofthumb/`. |
-| `mkdocs build --strict` warnings as errors | Fix the flagged link/docstring, don't drop `--strict`. |
-| Pages serves 404 / raw files | `docs/.nojekyll` must be committed; Pages source must be `main` → `/docs`. |
+| `sphinx-build -W` warnings as errors | Fix the flagged link/docstring, don't drop `-W`. |
+| Stale notebook outputs in the site | Clear the execution cache (`rm -rf .jupyter_cache`) and rebuild; changed notebooks re-run automatically. |
+| RTD build fails | Check `.readthedocs.yaml` (Python version, requirements path); reproduce locally with the §1 command; RTD needs `requirements.txt` to install cleanly on Ubuntu. |
 | Heavy install (`torch`, `transformers`, `shap`) surprises users | Known single-install decision (AGENTS.md); point to README install notes. |

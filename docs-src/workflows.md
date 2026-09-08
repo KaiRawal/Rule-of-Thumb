@@ -3,6 +3,8 @@
 Topics shared by all three modalities: reveal curves, tuning, persistence,
 non-linear shapes, plotting and devices.
 
+(reveal-curves)=
+
 ## Reveal curves
 
 `get_order` → `ordered_predict` → `score_ordering` simulates revealing
@@ -73,6 +75,8 @@ non-linear model is exactly the linear one. Explanations stay exactly
 additive, so plotting, reveal curves and persistence work unchanged; the
 configuration round-trips through save files. Omitting `nonlinear` keeps
 the plain linear model.
+
+(plotting)=
 
 ## Plotting
 

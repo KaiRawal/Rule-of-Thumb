@@ -50,9 +50,9 @@ in the changelog entry.
 ├── pyproject.toml          # uv_build; single-install deps; [dev]/[docs] extras only
 ├── LICENSE               # MIT licence
 ├── .gitignore
-├── mkdocs.yml + docs-src/  # docs source (guides, notebooks, API, test report)
-├── docs/                   # built site, committed (Pages serves main's /docs)
-├── PUBLISH.md              # PyPI + Pages release runbook (do not publish from CI)
+├── docs-src/ + conf.py     # docs source (Sphinx/MyST: guides, executed notebooks, API, test report)
+├── .readthedocs.yaml       # RTD hosting config (no built HTML is ever committed)
+├── PUBLISH.md              # PyPI + RTD release runbook (do not publish from CI)
 ├── requirements.txt        # pinned env matching pyproject (convenience)
 ├── ToDo.md                 # forward-looking package TODOs + changelog footer
 ├── README.md               # user docs incl. v0.1→v0.2 migration guide

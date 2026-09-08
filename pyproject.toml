@@ -34,7 +34,7 @@ dependencies = [
 Homepage = "https://github.com/KaiRawal/Rule-of-Thumb"
 Repository = "https://github.com/KaiRawal/Rule-of-Thumb"
 Issues = "https://github.com/KaiRawal/Rule-of-Thumb/issues"
-Documentation = "https://KaiRawal.github.io/Rule-of-Thumb/"
+Documentation = "https://ruleofthumb.readthedocs.io/"
 
 [project.optional-dependencies]
 dev = [
@@ -45,11 +45,10 @@ dev = [
     "pandas>=2.0",
 ]
 docs = [
-    "mkdocs>=1.6",
-    "mkdocstrings[python]>=0.28",
-    "mkdocs-material>=9.0",
-    "mkdocs-jupyter>=0.25",
-    "mkdocs-include-markdown-plugin>=6.0",
+    "sphinx>=8.0",
+    "myst-nb>=1.0",
+    "pydata-sphinx-theme>=0.15",
+    "sphinx-copybutton>=0.5",
 ]
 
 [tool.pytest.ini_options]

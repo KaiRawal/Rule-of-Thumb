@@ -13,4 +13,7 @@ __pycache__/
 .ipynb_checkpoints/
 # staged notebook copies (generated; see PUBLISH.md one-command docs build)
 docs-src/notebooks/
+# sphinx build output + notebook execution cache (never committed; RTD builds its own)
+docs-src/_build/
+.jupyter_cache/
 .cache/

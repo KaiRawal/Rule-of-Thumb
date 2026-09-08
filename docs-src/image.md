@@ -58,7 +58,7 @@ black box)? Supply `transform=` (a PIL Image → tensor callable), or use
 
 One reveal step covers a whole **pixel** (channels revealed together);
 `granularity="element"` restores per-element curves. Details:
-[Workflows](workflows.md#reveal-curves).
+{ref}`Workflows: reveal curves <reveal-curves>`.
 
 ## Worked notebook
 
@@ -68,6 +68,6 @@ The executed hello-world is
 
 ## Next steps
 
-- Saliency overlays: [Workflows](workflows.md#plotting).
+- Saliency overlays: {ref}`Workflows: plotting <plotting>`.
 - Prefer rich channel representations (e.g. MobileNet feature maps) —
   [Capacity](capacity.md) shows why raw pixels cap fidelity.
