@@ -11,6 +11,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .ipynb_checkpoints/
+# local credentials (never commit)
+.pypirc
+.readthedocs_api_key
 # staged notebook copies (generated; see PUBLISH.md one-command docs build)
 docs-src/notebooks/
 # sphinx build output + notebook execution cache (never committed; RTD builds its own)

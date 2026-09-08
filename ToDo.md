@@ -6,7 +6,7 @@ features build on, then new functionality.
 
 Standalone home: this package now lives at
 `https://github.com/KaiRawal/Rule-of-Thumb` (PyPI `ruleofthumb`, docs at
-`https://KaiRawal.github.io/Rule-of-Thumb/`), ported from the research
+`https://ruleofthumb.readthedocs.io/`), ported from the research
 monorepo's `pip-package` branch. Terse `(source: legacy ...)` pointers below
 are provenance notes only; the legacy code did not move with the package.
 
