@@ -32,7 +32,7 @@ class TextEmbeddings:
         embeddings: ``(N, tokens, dim)`` float32 array, zero-padded beyond
             each sample's true length.
         attention_mask: ``(N, tokens)`` boolean validity mask (``True`` marks
-            real tokens); pass as ``attention_mask=`` to ``fit_text``.
+            real tokens); pass as ``mask=`` to ``fit_text``.
         tokens: per-sample list of decoded token strings aligned with the
             embedding rows; padding positions are empty strings.
     """

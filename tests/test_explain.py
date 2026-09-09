@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import torch
 
+from ruleofthumb.text import lengths_to_mask
+
 
 @pytest.fixture
 def tabular_data():
@@ -39,7 +41,7 @@ def test_fit_auto_detects_modality(tabular_data, text_data, image_data):
 
     exp = rot.fit(y_tab, x_tab)
     assert exp.modality == "tabular"
-    exp = rot.fit(ty, tx, lengths=lengths)
+    exp = rot.fit(ty, tx, mask=lengths_to_mask(lengths, tx.shape[1]).numpy())
     assert exp.modality == "text"
     ix, imask, iy = image_data
     exp = rot.fit(iy, ix, mask=imask.numpy())
@@ -99,23 +101,27 @@ def test_text_explanation_shape(text_data):
     from ruleofthumb import fit_text
 
     x, lengths, y = text_data
-    exp = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, lengths=lengths)
-    imp = exp.get_explanation(x, lengths=lengths)
+    mask = lengths_to_mask(lengths, x.shape[1]).numpy()
+    exp = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask)
+    imp = exp.get_explanation(x, mask=mask)
     assert imp.shape == (32, 6)
 
 
-def test_text_attention_mask_matches_lengths(text_data):
+def test_text_mask_from_lengths_matches_manual(text_data):
+    """The documented ``lengths_to_mask`` bridge equals a hand-built mask."""
     from ruleofthumb import fit_text
 
     x, lengths, y = text_data
-    mask = torch.arange(6)[None, :] < lengths[:, None]
+    mask = lengths_to_mask(lengths, x.shape[1]).numpy()
+    manual = (torch.arange(6)[None, :] < lengths[:, None]).numpy()
+    assert (mask == manual).all()
     torch.manual_seed(0)
-    by_lengths = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, lengths=lengths)
+    by_bridge = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, mask=mask)
     torch.manual_seed(0)
-    by_mask = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, attention_mask=mask.numpy())
-    imp_by_lengths = by_lengths.get_explanation(x, lengths=lengths)
-    imp_by_mask = by_mask.get_explanation(x, attention_mask=mask.numpy())
-    assert np.allclose(imp_by_lengths, imp_by_mask)
+    by_manual = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, mask=manual)
+    assert np.allclose(
+        by_bridge.get_explanation(x, mask=mask), by_manual.get_explanation(x, mask=manual)
+    )
 
 
 def test_text_multiclass_per_class_output(text_data):
@@ -123,9 +129,10 @@ def test_text_multiclass_per_class_output(text_data):
 
     x, lengths, _ = text_data
     y3 = (x[:, 0, 0] > 0).astype(np.int64) + (x[:, 1, 1] > 0).astype(np.int64)  # labels in {0, 1, 2}
-    exp = fit_text(y3, x, epochs=4, batch_size=16, learning_rate=0.01, lengths=lengths, n_classes=3)
+    mask = lengths_to_mask(lengths, x.shape[1]).numpy()
+    exp = fit_text(y3, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, n_classes=3)
     assert exp.model.classes == 3
-    imp = exp.get_explanation(x, lengths=lengths)
+    imp = exp.get_explanation(x, mask=mask)
     # K > 2: full per-class output, class axis not collapsed
     assert imp.shape == (32, 3, 6)
     for k in range(3):
@@ -165,20 +172,21 @@ def test_modality_specific_padding_arguments_rejected(tabular_data, text_data, i
     x, y = tabular_data
     tx, lengths, ty = text_data
     ix, _imask, iy = image_data
+    tmask = lengths_to_mask(lengths, tx.shape[1]).numpy()
 
     tab = fit_tabular(y, x, epochs=2, batch_size=32)
-    with pytest.raises(ValueError, match="no padding"):
-        tab.get_explanation(x, lengths=lengths[:32])
+    with pytest.raises(ValueError, match="no mask"):
+        tab.get_explanation(x, mask=np.ones((64, 5), dtype=bool))
 
-    txt = fit_text(ty, tx, epochs=2, batch_size=16, lengths=lengths)
-    with pytest.raises(ValueError, match="at most one"):
-        txt.get_explanation(tx, lengths=lengths, attention_mask=np.ones((32, 6), dtype=bool))
-    # a plain (N, T) boolean mask is a valid alias for attention_mask on text
-    imp_by_alias = txt.get_explanation(tx, mask=(torch.arange(6)[None, :] < lengths[:, None]).numpy())
-    assert np.allclose(imp_by_alias, txt.get_explanation(tx, lengths=lengths))
+    # text speaks mask= only: the retired lengths=/attention_mask= spellings are TypeErrors
+    txt = fit_text(ty, tx, epochs=2, batch_size=16, mask=tmask)
+    with pytest.raises(TypeError):
+        txt.get_explanation(tx, lengths=lengths)
+    order = txt.get_order(torch.from_numpy(tx), mask=tmask)
+    assert (order[:, -1] == -1).any()  # padding ranked last
 
     img = fit_image(iy, ix, epochs=2, batch_size=16)
-    with pytest.raises(ValueError, match="mask= only"):
+    with pytest.raises(TypeError):
         img.get_explanation(ix, lengths=torch.tensor([6] * 16))
 
 
@@ -203,27 +211,29 @@ def test_explainer_threads_training_hyperparameters(tabular_data, text_data):
     assert exp.get_explanation(x).shape == (64, 5)
 
     tx, lengths, ty = text_data
+    tmask = lengths_to_mask(lengths, tx.shape[1]).numpy()
     exp_text = fit_text(
         ty,
         tx,
         epochs=4,
         batch_size=16,
         learning_rate=0.01,
-        lengths=lengths,
+        mask=tmask,
         pretrain_epochs=1,
         weight_decay=0.1,
         l1_penalty=0.05,
     )
-    assert exp_text.get_explanation(tx, lengths=lengths).shape == (32, 6)
+    assert exp_text.get_explanation(tx, mask=tmask).shape == (32, 6)
 
 
 def test_explainer_seed_reproducibility(text_data):
     from ruleofthumb import fit_text
 
     x, lengths, y = text_data
-    exp_a = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, lengths=lengths, seed=0)
-    exp_b = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, lengths=lengths, seed=0)
-    assert np.allclose(exp_a.get_explanation(x, lengths=lengths), exp_b.get_explanation(x, lengths=lengths))
+    mask = lengths_to_mask(lengths, x.shape[1]).numpy()
+    exp_a = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, seed=0)
+    exp_b = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, seed=0)
+    assert np.allclose(exp_a.get_explanation(x, mask=mask), exp_b.get_explanation(x, mask=mask))
 
 
 def test_explainer_device_parameter(tabular_data, text_data):
@@ -235,8 +245,9 @@ def test_explainer_device_parameter(tabular_data, text_data):
     assert exp.get_explanation(x).shape == (64, 5)
 
     tx, lengths, ty = text_data
-    exp_text = fit_text(ty, tx, epochs=4, batch_size=16, learning_rate=0.01, lengths=lengths, device="cpu")
-    assert exp_text.get_explanation(tx, lengths=lengths).shape == (32, 6)
+    tmask = lengths_to_mask(lengths, tx.shape[1]).numpy()
+    exp_text = fit_text(ty, tx, epochs=4, batch_size=16, learning_rate=0.01, mask=tmask, device="cpu")
+    assert exp_text.get_explanation(tx, mask=tmask).shape == (32, 6)
 
 
 def test_explainer_delegates_reveal_pipeline(tabular_data):

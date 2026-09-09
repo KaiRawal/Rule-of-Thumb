@@ -8,12 +8,15 @@ from ruleofthumb import fit_image, fit_tabular, fit_text, load_explainer
 
 
 def _dataset(modality):
+    from ruleofthumb.text import lengths_to_mask
+
     rng = np.random.RandomState(0)
     y = (rng.rand(32) > 0.5).astype(np.int64)
     if modality == "tabular":
         return (rng.rand(32, 4).astype(np.float32), None, y)
     if modality == "text":
-        return (rng.rand(32, 6, 4).astype(np.float32), np.array([6, 4] * 16), y)
+        mask = lengths_to_mask(np.array([6, 4] * 16), 6).numpy()
+        return (rng.rand(32, 6, 4).astype(np.float32), mask, y)
     return (rng.rand(32, 3, 5, 5).astype(np.float32), None, y)
 
 
@@ -22,14 +25,12 @@ def _fit(modality, x, padding, y):
     if modality == "tabular":
         return fit_tabular(y, x, **kwargs)
     if modality == "text":
-        return fit_text(y, x, lengths=padding, **kwargs)
+        return fit_text(y, x, mask=padding, **kwargs)
     return fit_image(y, x, **kwargs)
 
 
 @pytest.mark.parametrize("modality", ["tabular", "text", "image"])
 def test_round_trip_preserves_outputs(tmp_path, modality):
-    from ruleofthumb.text import lengths_to_mask
-
     x, padding, y = _dataset(modality)
     exp = _fit(modality, x, padding, y)
     path = tmp_path / "explainer.rotx"
@@ -37,9 +38,9 @@ def test_round_trip_preserves_outputs(tmp_path, modality):
 
     loaded = load_explainer(str(path))
     assert loaded.modality == modality
-    assert np.allclose(exp.get_explanation(x, lengths=padding), loaded.get_explanation(x, lengths=padding))
+    assert np.allclose(exp.get_explanation(x, mask=padding), loaded.get_explanation(x, mask=padding))
     xt = torch.from_numpy(x)
-    mask = lengths_to_mask(padding, x.shape[1]) if padding is not None else None
+    mask = None if padding is None else torch.from_numpy(padding)
     assert torch.allclose(exp.predict(xt, mask=mask), loaded.predict(xt, mask=mask))
     assert np.array_equal(exp.get_order(xt, mask=mask), loaded.get_order(xt, mask=mask))
 

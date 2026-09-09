@@ -1,13 +1,12 @@
-"""Tests pinning v0.2 mask-aware behaviour (replaces the v0.1 limitation pins).
+"""Tests pinning explicit mask-aware behaviour.
 
-Since v0.2 padding is explicit: masks are passed by callers and no fill value
+Padding is explicit: masks are passed by callers and no fill value
 has special meaning. These tests pin:
 
 - text/image models accept rectangular batches plus validity masks;
 - ragged inputs are handled by ``pad_sequences`` / ``pad_images`` utilities;
 - the incremental-reveal pipeline (``get_order`` / ``ordered_predict`` /
-  ``score_ordering``) is mask-aware;
-- legacy ``-1`` sentinel workflows migrate via ``sentinel_mask``.
+  ``score_ordering``) is mask-aware.
 """
 
 import numpy as np
@@ -16,7 +15,7 @@ import torch
 
 from ruleofthumb.core import RoT
 from ruleofthumb.image import RoTImage, pad_images
-from ruleofthumb.text import RoTText, pad_sequences, sentinel_mask
+from ruleofthumb.text import RoTText, pad_sequences
 
 
 def lengths_to_bool(lengths, max_len):
@@ -24,13 +23,14 @@ def lengths_to_bool(lengths, max_len):
 
 
 @pytest.fixture
-def legacy_sentinel_text():
+def masked_text():
     rng = np.random.RandomState(3)
     x = rng.randn(8, 7, 4).astype(np.float32)
-    x[:, -3:, :] = -1.0  # v0.1-style sentinel padding
-    lengths = torch.full((8,), 4, dtype=torch.long)
+    x[:, -3:, :] = 0.0  # padding value is irrelevant; the mask carries the truth
+    mask = torch.zeros(8, 7, dtype=torch.bool)
+    mask[:, :4] = True
     y = torch.from_numpy((x[:, 0, 0] > 0).astype(np.int64))
-    return torch.from_numpy(x), lengths, y
+    return torch.from_numpy(x), mask, y
 
 
 def test_ragged_text_via_pad_sequences():
@@ -42,24 +42,23 @@ def test_ragged_text_via_pad_sequences():
     assert torch.all(imp[0, :, 3:, :] == 0)
 
 
-def test_v01_sentinel_scores_reproduce_with_explicit_mask(legacy_sentinel_text):
-    """Explicit ``sentinel_mask`` + mask-aware scoring matches v0.1 semantics."""
+def test_explicit_mask_scores_match_manual_reference(masked_text):
+    """Mask-aware scoring matches the manual per-token reference."""
     torch.manual_seed(0)
-    x, _, _ = legacy_sentinel_text
+    x, mask, _ = masked_text
     model = RoTText(2, (7, 4))
     torch.nn.init.normal_(model.a, std=1.0)
     torch.nn.init.normal_(model.b, std=1.0)
 
-    mask = sentinel_mask(x)
     score = model.score(x, mask=mask).cpu()
 
-    # v0.1 formula: mean over non-padded tokens of per-token importance sums,
+    # reference: mean over real tokens of per-token importance sums,
     # summed over embedding dims, plus g (computed on CPU with host-side weights).
     a, b, g = model.a.detach().cpu(), model.b.detach().cpu(), model.g.detach().cpu()
     imp = a[None, :, None, :] * (x[:, None] + b[None, :, None, :])
     expected = imp[:, :, :4, :].sum(dim=(2, 3)) / 4 + g[None, :]
     assert torch.allclose(score, expected)
-    # without the mask, padded tokens would leak into the score (v0.1 quirk gone)
+    # without the mask, padded tokens would leak into the score
     assert not torch.allclose(score, model.score(x).cpu())
 
 
@@ -234,9 +233,10 @@ def test_legacy_imports_are_gone():
 
     assert not hasattr(rot, "RoT_text")
     assert not hasattr(rot, "RoT_image")
+    assert not hasattr(rot, "sentinel_mask")
 
 
-@pytest.mark.parametrize("util", ["pad_sequences", "sentinel_mask", "pad_images"])
+@pytest.mark.parametrize("util", ["pad_sequences", "lengths_to_mask", "pad_images"])
 def test_padding_utils_exported(util):
     import ruleofthumb as rot
 

@@ -22,14 +22,15 @@ importances = exp.get_explanation(X_train)
 ```python
 import numpy as np
 import ruleofthumb as rot
-from ruleofthumb.text import pad_sequences
+from ruleofthumb.text import lengths_to_mask, pad_sequences
 
 sequences = [np.random.rand(t, 384).astype(np.float32) for t in (20, 14, 17, 9)]
 x, lengths = pad_sequences(sequences)
 labels = np.array([1, 0, 1, 0], dtype=np.int64)
+mask = lengths_to_mask(lengths, x.shape[1]).numpy()
 
-exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), lengths=lengths)
-token_importances = exp.get_explanation(x.numpy(), lengths=lengths)
+exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), mask=mask)
+token_importances = exp.get_explanation(x.numpy(), mask=mask)
 ```
 
 Raw strings are embedded automatically (default

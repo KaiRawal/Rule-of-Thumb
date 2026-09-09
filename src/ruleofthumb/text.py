@@ -5,10 +5,9 @@ Port of ``RoT_text`` from the original experiment code
 form: token x embedding.
 
 Since v0.2 padding is explicit: every method takes an optional boolean
-``mask`` of shape ``(N, tokens)`` marking real (non-padding) tokens. There is
-no implicit ``-1`` sentinel detection any more; use :func:`sentinel_mask` to
-migrate legacy ``-1``-padded arrays or :func:`pad_sequences` to pad ragged
-inputs.
+``mask`` of shape ``(N, tokens)`` marking real (non-padding) tokens. Use
+:func:`pad_sequences` to pad ragged inputs and :func:`lengths_to_mask` to
+build the matching mask.
 """
 
 import torch
@@ -39,18 +38,6 @@ def pad_sequences(sequences, pad_value=0.0):
     for i, s in enumerate(seqs):
         padded[i, : s.shape[0]] = s
     return padded, torch.tensor([int(s.shape[0]) for s in seqs])
-
-
-def sentinel_mask(points, value=-1.0):
-    """Rebuild an explicit validity mask from legacy sentinel-padded data.
-
-    v0.1 treated tokens whose embedding was entirely ``value`` (by default
-    ``-1``) as padding. New code should pass masks explicitly; this helper
-    reproduces that detection for migrating old inputs. Returns a validity
-    mask (``True`` marks real tokens).
-    """
-    points = torch.as_tensor(points)
-    return ~(points == value).all(dim=-1)
 
 
 class RoTText(RoT):

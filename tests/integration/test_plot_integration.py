@@ -46,9 +46,9 @@ def test_text_html_highlights_real_tokens(text_sst2):
     texts = text_sst2["texts"]
     embedded = embed_texts(texts)
     mask = embedded.attention_mask
-    explainer = fit_text(text_sst2["y"], embedded.embeddings, attention_mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    explainer = fit_text(text_sst2["y"], embedded.embeddings, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
 
-    imp = explainer.get_explanation(embedded.embeddings, attention_mask=mask)[0]
+    imp = explainer.get_explanation(embedded.embeddings, mask=mask)[0]
     tokens = embedded.tokens[0]
     html = getattr(plot.text_html(imp, tokens), "data", "")
 
@@ -71,11 +71,11 @@ def test_word_clouds_render_review_tokens(text_sst2):
     texts = text_sst2["texts"]
     embedded = embed_texts(texts)
     mask = embedded.attention_mask
-    explainer = fit_text(text_sst2["y"], embedded.embeddings, attention_mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    explainer = fit_text(text_sst2["y"], embedded.embeddings, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
 
     rows, token_lists = [], []
     for i in range(len(texts)):
-        imp = explainer.get_explanation(embedded.embeddings, attention_mask=mask)[i]
+        imp = explainer.get_explanation(embedded.embeddings, mask=mask)[i]
         rows.append(imp)
         token_lists.append([t for t, real in zip(embedded.tokens[i], mask[i]) if real])
 

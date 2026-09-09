@@ -59,7 +59,7 @@ in the changelog entry.
 ├── README.md               # user docs incl. v0.1→v0.2 migration guide
 ├── src/ruleofthumb/
 │   ├── core.py             # RoT base class
-│   ├── text.py             # RoTText, pad_sequences, sentinel_mask, lengths_to_mask
+│   ├── text.py             # RoTText, pad_sequences, lengths_to_mask
 │   ├── image.py            # RoTImage, pad_images
 │   ├── explain.py          # Explainer facade + fit / fit_tabular / fit_text / fit_image factories
 │   └── __init__.py         # exports + __version__
@@ -84,12 +84,12 @@ Key mechanics:
 These were deliberate choices made during the v0.1 → v0.2.x evolution. Do not
 regress them:
 
-1. **Masks are first-class and explicit** (v0.2.0, breaking change). Padding
-   is *never* inferred from data values; `-1` has no special meaning anywhere.
-   Convention: masks are boolean validity tensors (`True` = real token /
-   pixel). Utilities return `(padded_batch, lengths_or_mask)`.
-   `ruleofthumb.text.sentinel_mask` exists solely to migrate legacy `-1`
-   padded arrays.
+1. **Masks are first-class and explicit**. Padding is *never* inferred
+   from data values; `-1` has no special meaning anywhere. Convention:
+   masks are boolean validity tensors (`True` = real token / pixel).
+   Utilities return `(padded_batch, lengths_or_mask)`; text entry points
+   speak a single `mask=` spelling (build it from lengths with
+   `lengths_to_mask`).
 2. **Unit-granularity reveal curves by default** (v0.2.1): one reveal step per
    token (text) or pixel (image), aggregating embedding dims / channels via
    abs-sum. `granularity="element"` restores per-feature-element curves; the

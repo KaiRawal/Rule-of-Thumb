@@ -43,7 +43,7 @@ def _iter_words(encoded, tokenizer, i):
 
 
 def _fit_text(embeddings, attention_mask, y):
-    return fit_text(y, embeddings, attention_mask=attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    return fit_text(y, embeddings, mask=attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
 
 
 def test_black_box_predictions_are_confident(text_sst2):
@@ -57,7 +57,7 @@ def test_explanation_shape_and_padding_zeros(text_sst2):
     mask = text_sst2["attention_mask"]
     exp = _fit_text(embeddings, mask.numpy(), text_sst2["y"])
 
-    imp = exp.get_explanation(embeddings, attention_mask=mask.numpy())
+    imp = exp.get_explanation(embeddings, mask=mask.numpy())
     n, tokens = mask.shape
     assert imp.shape == (n, tokens)
     assert np.isfinite(imp).all()
@@ -70,7 +70,7 @@ def test_sentiment_words_carry_signed_importance(text_sst2):
     tokenizer = text_sst2["tokenizer"]
     encoded = text_sst2["encoded"]
     exp = _fit_text(text_sst2["embeddings"], text_sst2["attention_mask"].numpy(), text_sst2["y"])
-    imp = exp.get_explanation(text_sst2["embeddings"], attention_mask=text_sst2["attention_mask"].numpy())
+    imp = exp.get_explanation(text_sst2["embeddings"], mask=text_sst2["attention_mask"].numpy())
 
     positive_mass, negative_mass = 0.0, 0.0
     for i in range(len(text_sst2["texts"])):
@@ -90,7 +90,7 @@ def test_top_tokens_carry_sentiment_words(text_sst2):
     """Explicit importance check: sentiment words dominate each review's top tokens."""
     encoded, tokenizer = text_sst2["encoded"], text_sst2["tokenizer"]
     exp = _fit_text(text_sst2["embeddings"], text_sst2["attention_mask"].numpy(), text_sst2["y"])
-    imp = exp.get_explanation(text_sst2["embeddings"], attention_mask=text_sst2["attention_mask"].numpy())
+    imp = exp.get_explanation(text_sst2["embeddings"], mask=text_sst2["attention_mask"].numpy())
 
     positive_hits = negative_hits = positive_n = negative_n = 0
     for i, text in enumerate(text_sst2["texts"]):
@@ -111,7 +111,7 @@ def test_brilliant_outranks_awful_in_the_pair_review(text_sst2):
     """In the mixed review containing both words, 'brilliant' must win on class-1 mass."""
     encoded, tokenizer = text_sst2["encoded"], text_sst2["tokenizer"]
     exp = _fit_text(text_sst2["embeddings"], text_sst2["attention_mask"].numpy(), text_sst2["y"])
-    imp = exp.get_explanation(text_sst2["embeddings"], attention_mask=text_sst2["attention_mask"].numpy())
+    imp = exp.get_explanation(text_sst2["embeddings"], mask=text_sst2["attention_mask"].numpy())
 
     pair_rows = [
         i
@@ -151,8 +151,8 @@ def test_reveal_curve_recovers_full_accuracy(text_sst2):
 def test_seed_reproducibility(text_sst2):
     embeddings, y = text_sst2["embeddings"], text_sst2["y"]
     mask = text_sst2["attention_mask"].numpy()
-    imp_a = _fit_text(embeddings, mask, y).get_explanation(embeddings, attention_mask=mask)
-    imp_b = _fit_text(embeddings, mask, y).get_explanation(embeddings, attention_mask=mask)
+    imp_a = _fit_text(embeddings, mask, y).get_explanation(embeddings, mask=mask)
+    imp_b = _fit_text(embeddings, mask, y).get_explanation(embeddings, mask=mask)
     assert np.allclose(imp_a, imp_b)
 
 
@@ -230,10 +230,10 @@ def test_native_path_equals_array_path(text_sst2):
 
     native = fit_text(y, texts, tokenizer=tokenizer, model=backbone, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
     arrays = fit_text(
-        y, emb.embeddings, attention_mask=emb.attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED
+        y, emb.embeddings, mask=emb.attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED
     )
 
     imp_native = native.get_explanation(texts)
-    imp_arrays = arrays.get_explanation(emb.embeddings, attention_mask=emb.attention_mask)
+    imp_arrays = arrays.get_explanation(emb.embeddings, mask=emb.attention_mask)
     assert imp_native.shape == imp_arrays.shape
     assert np.allclose(imp_native, imp_arrays)

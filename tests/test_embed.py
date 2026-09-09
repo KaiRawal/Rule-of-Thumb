@@ -174,7 +174,7 @@ def test_strings_with_explicit_padding_rejected(stubs):
 
     tokenizer, model = stubs
     with pytest.raises(ValueError, match="automatically"):
-        fit_text(np.array([0, 1]), ["a bb", "ccc"], attention_mask=np.ones((2, 3)), tokenizer=tokenizer, model=model)
+        fit_text(np.array([0, 1]), ["a bb", "ccc"], mask=np.ones((2, 3)), tokenizer=tokenizer, model=model)
 
 
 def test_get_explanation_strings_on_array_fitted_raises(stubs):

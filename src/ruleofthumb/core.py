@@ -276,6 +276,10 @@ class RoT(torch.nn.Module):
         reported as ``-1`` in the returned order; real positions form a
         permutation prefix per sample.
 
+        Shapes mirror the modality: tabular ``(N, D)``, text ``(N, T)``,
+        image ``(N, H, W)`` (spatial layout preserved; entries are flat
+        pixel indices or ``-1``).
+
         Ranking happens on the host: the returned order is a numpy array.
         """
         imp = self.importance(points, mask=mask).detach().cpu()
@@ -328,6 +332,19 @@ class RoT(torch.nn.Module):
         """
         if metric is not None and return_confusion:
             raise ValueError("return_confusion=True cannot be combined with a custom metric")
+        label_arr = np.asarray(labels)
+        if label_arr.ndim != 1:
+            raise ValueError(
+                f"score_ordering(points, labels, order): labels must be a 1-D array, got shape {label_arr.shape}; "
+                "did you swap points and labels?"
+            )
+        n_points = torch.as_tensor(points).shape[0]
+        n_order = np.asarray(order).shape[0]
+        if label_arr.shape[0] != n_points or n_order != n_points:
+            raise ValueError(
+                "score_ordering(points, labels, order): points, labels and order must cover "
+                f"the same number of samples, got {n_points}, {label_arr.shape[0]} and {n_order}"
+            )
         pred = self.ordered_predict(points, order, include_padded=include_padded, granularity=granularity).cpu()
         labels = torch.as_tensor(labels).cpu()
         valid = pred != -1

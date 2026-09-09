@@ -73,7 +73,7 @@ def load_images(
         elif size is not None:
             tensors.append(_resize_and_crop(pil, size))
         else:
-            tensors.append(torch.from_numpy(np.asarray(pil)).permute(2, 0, 1).to(torch.float32) / 255.0)
+            tensors.append(torch.from_numpy(np.array(pil)).permute(2, 0, 1).to(torch.float32) / 255.0)
 
     channels = int(tensors[0].shape[0])
     if any(t.shape[0] != channels for t in tensors):

@@ -90,9 +90,26 @@ def _subset(inputs, indices):
     return inputs[indices]
 
 
-def _validation_score(explainer, x_val, y_val):
+def _split_value(value, indices, n):
+    """Split a sample-aligned ``autotune`` kwarg alongside ``x`` / ``y``; pass the rest through."""
+    if value is None or isinstance(value, (str, dict)):
+        return value
+    try:
+        length = len(value)
+    except TypeError:
+        return value
+    if length != n:
+        return value
+    return _subset(list(value) if isinstance(value, list) else np.asarray(value), indices)
+
+
+def _split_kwargs(kwargs, indices, n):
+    return {key: _split_value(value, indices, n) for key, value in kwargs.items()}
+
+
+def _validation_score(explainer, x_val, y_val, mask=None):
     """Final-step reveal accuracy on held-out data."""
-    order = explainer.get_order(x_val)
+    order = explainer.get_order(x_val, mask=mask)
     curve = explainer.score_ordering(x_val, torch.from_numpy(np.asarray(y_val).astype(np.int64)), order)
     return float(curve[-1])
 
@@ -108,6 +125,8 @@ def autotune(
     validation_split: float = 0.25,
     seed: int | None = None,
     device: Any | None = None,
+    n_classes: int | None = None,
+    **model_kwargs: Any,
 ) -> AutotuneResult:
     """Search the training hyperparameters and return the best fitted explainer.
 
@@ -131,6 +150,13 @@ def autotune(
         validation_split: fraction of samples held out for scoring.
         seed: controls the split, candidate sampling and candidate fits.
         device: forwarded to the factories.
+        n_classes: forwarded to the factories; inferred from
+            ``len(unique(y_outputs))`` when omitted.
+        **model_kwargs: forwarded to the factories for both the candidate
+            fits and the final refit (e.g. ``nonlinear``, ``l1_penalty``,
+            ``dropout_rate``, ``mask``). Sample-aligned array values (a
+            ``mask`` with one entry per sample) are split alongside ``x`` /
+            ``y``; scalars, strings and dicts pass through whole.
 
     Returns:
         :class:`AutotuneResult` with the full-data refit in ``.explainer``.
@@ -148,19 +174,25 @@ def autotune(
     factory = _FACTORIES[modality]
     inputs = list(x_inputs) if _is_string_batch(x_inputs) else np.asarray(x_inputs)
     labels = np.asarray(y_outputs).flatten()
+    if n_classes is None:
+        n_classes = len(np.unique(labels))
 
     train_idx, val_idx = _split(len(inputs), validation_split, seed)
     x_train, y_train = _subset(inputs, train_idx), labels[train_idx]
     x_val, y_val = _subset(inputs, val_idx), labels[val_idx]
+    train_kwargs = _split_kwargs(model_kwargs, train_idx, len(inputs))
+    val_mask = _split_value(model_kwargs.get("mask"), val_idx, len(inputs))
 
     trials = []
     for i, params in enumerate(_candidates(space, search, n_candidates, seed)):
         candidate_seed = None if seed is None else seed + i
-        candidate = factory(y_train, x_train, seed=candidate_seed, device=device, **params)
-        score = _validation_score(candidate, x_val, y_val)
+        candidate = factory(
+            y_train, x_train, seed=candidate_seed, device=device, n_classes=n_classes, **train_kwargs, **params
+        )
+        score = _validation_score(candidate, x_val, y_val, mask=val_mask)
         trials.append({"params": params, "score": score})
     trials.sort(key=lambda trial: trial["score"], reverse=True)
 
     best = trials[0]
-    explainer = factory(y_outputs, x_inputs, seed=seed, device=device, **best["params"])
+    explainer = factory(y_outputs, x_inputs, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
     return AutotuneResult(explainer=explainer, best_params=best["params"], best_score=best["score"], trials=trials)

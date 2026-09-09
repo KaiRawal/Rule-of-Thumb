@@ -23,18 +23,7 @@ import torch
 from ruleofthumb.core import RoT
 from ruleofthumb.embed import embed_texts
 from ruleofthumb.image import RoTImage, load_images
-from ruleofthumb.text import RoTText, lengths_to_mask
-
-
-def _as_token_mask(mask_or_lengths, n_tokens):
-    """Normalise an attention mask given as a ``(N, T)`` array or lengths."""
-    if mask_or_lengths is None:
-        return None
-    m = torch.as_tensor(np.asarray(mask_or_lengths))
-    if m.ndim == 1:
-        return lengths_to_mask(m, n_tokens)
-    return m.to(torch.bool)
-
+from ruleofthumb.text import RoTText
 
 _IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"})
 
@@ -110,7 +99,7 @@ class Explainer:
         batch = self._image_loader(list(x))
         return torch.from_numpy(batch.images).to(self._model.device), torch.from_numpy(batch.mask)
 
-    def get_explanation(self, x_numpy, *, mask=None, attention_mask=None, lengths=None) -> np.ndarray:
+    def get_explanation(self, x_numpy, *, mask=None) -> np.ndarray:
         """Return signed importances, comparable to SHAP values.
 
         For binary tasks (``n_classes == 2``) the result holds the class-1
@@ -121,44 +110,31 @@ class Explainer:
         Shapes: tabular ``(N, d)`` / ``(N, K, d)``; text ``(N, tokens)`` /
         ``(N, K, tokens)`` (embedding dims summed per token); image
         ``(N, H, W)`` / ``(N, K, H, W)`` (channels summed per pixel). Padded
-        positions receive exactly zero importance when a mask/lengths is
-        supplied.
+        positions receive exactly zero importance when a mask is supplied.
 
         Padding arguments depend on the modality: tabular takes none, text
-        accepts at most one of ``mask`` / ``attention_mask`` / ``lengths``
-        (or none at all when ``x_numpy`` is a list of raw strings — padding
-        is derived automatically), image accepts ``mask`` only (or none at
-        all for file paths).
+        and image accept ``mask`` (or none at all for raw strings / file
+        paths — padding is derived automatically). Build text masks from
+        per-sample token counts with
+        :func:`ruleofthumb.text.lengths_to_mask`.
         """
         resolved = self._resolve_native(x_numpy)
         if resolved is not None:
-            if mask is not None or attention_mask is not None or lengths is not None:
-                raise ValueError("raw inputs derive their padding automatically; pass no padding arguments")
+            if mask is not None:
+                raise ValueError("raw inputs derive their padding automatically; pass no mask")
             x, native_mask = resolved
         else:
             x = torch.from_numpy(np.asarray(x_numpy)).to(self._model.device)
             native_mask = None
-        given = [
-            name
-            for name, value in (("mask", mask), ("attention_mask", attention_mask), ("lengths", lengths))
-            if value is not None
-        ]
         if self._modality == "tabular":
-            if given:
-                raise ValueError(f"tabular explanations take no padding arguments, got {given}")
+            if mask is not None:
+                raise ValueError("tabular explanations take no mask")
             imp = self._model.importance(x)
         elif self._modality == "text":
-            if len(given) > 1:
-                raise ValueError(f"pass at most one of mask / attention_mask / lengths, got {given}")
             if resolved is None:
-                padding = lengths if attention_mask is None else attention_mask
-                if padding is None:
-                    padding = mask
-                native_mask = _as_token_mask(padding, x.shape[1])
+                native_mask = None if mask is None else torch.as_tensor(np.asarray(mask)).to(torch.bool)
             imp = self._model.importance(x, mask=native_mask)
         else:
-            if attention_mask is not None or lengths is not None:
-                raise ValueError("image explanations take mask= only")
             if resolved is not None:
                 imp = self._model.importance(x, mask=native_mask)
             else:
@@ -183,9 +159,20 @@ class Explainer:
                 kwargs["mask"] = mask
         return getattr(self._model, name)(*args, **kwargs)
 
-    def get_order(self, *args, **kwargs):
-        """See :meth:`ruleofthumb.core.RoT.get_order`. Accepts raw strings / file paths."""
-        return self._delegate("get_order", args, kwargs)
+    def get_order(self, points, *, mask=None, granularity="unit"):
+        """Rank reveal units by absolute importance, most important first.
+
+        See :meth:`ruleofthumb.core.RoT.get_order`. Text array inputs take a
+        boolean ``mask`` of shape ``(N, tokens)``; padded positions are ranked
+        last as ``-1``. Raw strings / file paths derive their padding
+        automatically (pass no mask). ``score_ordering`` takes no mask: the
+        ``-1`` entries in the returned order already encode the padding.
+        """
+        if self._modality == "tabular" and mask is not None:
+            raise ValueError("tabular explainers take no mask")
+        if self._modality == "text" and mask is not None and not _is_string_batch(points):
+            mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
+        return self._delegate("get_order", (points,), {"mask": mask, "granularity": granularity})
 
     def ordered_predict(self, *args, **kwargs):
         """See :meth:`ruleofthumb.core.RoT.ordered_predict`. Accepts raw strings / file paths."""
@@ -336,8 +323,7 @@ def fit_text(
     y_outputs,
     x_inputs,
     *,
-    lengths=None,
-    attention_mask=None,
+    mask=None,
     tokenizer=None,
     model=None,
     l1_penalty=0.01,
@@ -357,27 +343,28 @@ def fit_text(
     Pass a list of raw strings and they are embedded automatically with the
     bundled default HuggingFace model (:data:`ruleofthumb.DEFAULT_TEXT_MODEL`);
     supply ``tokenizer`` / ``model`` (a pre-loaded ``AutoModel``) to override
-    it. Padding masks are derived automatically — ``lengths`` /
-    ``attention_mask`` must not be given alongside strings.
+    it. Padding masks are derived automatically — ``mask`` must not be given
+    alongside strings.
 
-    For array inputs, padding is explicit: pass ``attention_mask`` (an
-    ``(N, T)`` boolean array) or ``lengths`` (per-sample token counts);
-    HuggingFace tokenizer ``attention_mask`` tensors compose directly.
-    Without either, every token is treated as real data.
+    For array inputs, padding is explicit: pass ``mask`` (an ``(N, T)``
+    boolean array marking real tokens). HuggingFace tokenizer
+    ``attention_mask`` tensors and :func:`ruleofthumb.text.lengths_to_mask`
+    output compose directly. Without a mask, every token is treated as real
+    data.
 
     Explainers fitted from strings accept the same strings back in every
     public method; each call re-embeds the texts.
     """
     string_embedder = None
     if _is_string_batch(x_inputs):
-        if lengths is not None or attention_mask is not None:
-            raise ValueError("raw strings derive their padding automatically; pass neither lengths nor attention_mask")
+        if mask is not None:
+            raise ValueError("raw strings derive their padding automatically; pass no mask")
         string_embedder = functools.partial(embed_texts, tokenizer=tokenizer, model=model, device=device)
         embedded = string_embedder(list(x_inputs))
         x_inputs = embedded.embeddings
         mask = torch.from_numpy(embedded.attention_mask)
-    else:
-        mask = _as_token_mask(lengths if attention_mask is None else attention_mask, x_inputs.shape[1])
+    elif mask is not None:
+        mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
     rot = RoTText(
         n_classes,
         (x_inputs.shape[1], x_inputs.shape[2]),

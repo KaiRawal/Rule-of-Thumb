@@ -228,3 +228,26 @@ def test_training_loop_seed_reproducibility(tabular_data):
         model.training_loop(model.loss, x, y, optimiser, epochs=4, batch_size=32, seed=123)
         losses.append(model.training_loss)
     assert np.array_equal(losses[0], losses[1])
+
+
+def test_score_ordering_rejects_swapped_points_and_labels(tabular_data):
+    """Swapping points/labels must fail loudly, not deep in torch (sandbox Bug 3)."""
+    x, y = tabular_data
+    xt = torch.from_numpy(x)
+    model = RoT(2, (5,))
+    model.fit(xt, y, epochs=4, batch_size=32, lr=0.05)
+    order = model.get_order(xt)
+
+    with pytest.raises(ValueError, match="swap"):
+        model.score_ordering(y, xt, order)
+
+
+def test_score_ordering_rejects_mismatched_sample_counts(tabular_data):
+    x, y = tabular_data
+    xt = torch.from_numpy(x)
+    model = RoT(2, (5,))
+    model.fit(xt, y, epochs=4, batch_size=32, lr=0.05)
+    order = model.get_order(xt)
+
+    with pytest.raises(ValueError, match="same number of samples"):
+        model.score_ordering(xt[:10], y, order)

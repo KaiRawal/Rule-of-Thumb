@@ -23,6 +23,9 @@ inputs most-important-first and scores prediction fidelity along the curve:
   label, columns = predicted class), or `metric=` for a custom callable
   over binary counts `(tp, fp, fn, tn)` — use custom metrics only where
   that view is meaningful.
+- Argument order is `score_ordering(points, labels, order)`; swapping the
+  first two raises a `ValueError` naming the swap instead of failing deep
+  inside torch.
 
 ## Automatic hyperparameter tuning
 
@@ -42,6 +45,18 @@ result.trials       # every candidate with its validation score, best-first
 `search="grid"` enumerates a `space=` dict exhaustively; `space=` accepts
 any subset of the defaults. Works for all three modalities, including raw
 strings and image paths.
+
+`n_classes` is inferred from the labels (override explicitly when a split
+might miss a class). Any other factory keyword (`nonlinear`,
+`l1_penalty`, `dropout_rate`, `mask`, ...) is forwarded to both the
+candidate fits and the final refit; a per-sample `mask` is split alongside
+the data:
+
+```python
+result = rot.autotune(y_outputs=labels, x_inputs=x, search="grid",
+                              space={"epochs": [100, 300]},
+                              nonlinear="hinge", mask=mask, seed=0)
+```
 
 ## Saving and loading
 

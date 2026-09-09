@@ -36,12 +36,12 @@ def test_tabular_round_trip(tmp_path, tabular_binary):
 
 def test_text_round_trip(tmp_path, text_sst2):
     x, mask, y = text_sst2["embeddings"], text_sst2["attention_mask"].numpy(), text_sst2["y"]
-    exp = fit_text(y, x, attention_mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    exp = fit_text(y, x, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
     path = tmp_path / "text.rotx"
     exp.save(str(path))
 
     loaded = load_explainer(str(path))
-    assert np.allclose(exp.get_explanation(x, attention_mask=mask), loaded.get_explanation(x, attention_mask=mask))
+    assert np.allclose(exp.get_explanation(x, mask=mask), loaded.get_explanation(x, mask=mask))
     xt = torch.from_numpy(x)
     mt = torch.from_numpy(mask)
     assert np.array_equal(exp.get_order(xt, mask=mt), loaded.get_order(xt, mask=mt))

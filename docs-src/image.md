@@ -34,6 +34,11 @@ for img in images:
     single_imp = model.importance(torch.from_numpy(img[None]))
 ```
 
+Note the two importance conventions: the raw model returns per-element
+importances of shape `(N, K, C, H, W)` (batch, classes, channels, height,
+width), while `Explainer.get_explanation` reduces over classes and channels
+to per-pixel saliency of shape `(N, H, W)` (or `(N, K, H, W)` multiclass).
+
 ## Image files
 
 Pass paths straight in — `fit_image` decodes them (RGB, `[0, 1]` floats),
@@ -57,7 +62,11 @@ black box)? Supply `transform=` (a PIL Image → tensor callable), or use
 ## Reveal pipeline
 
 One reveal step covers a whole **pixel** (channels revealed together);
-`granularity="element"` restores per-element curves. Details:
+`granularity="element"` restores per-element curves. Unlike tabular
+(`(N, D)`) and text (`(N, T)`), the image order preserves the spatial layout
+`(N, H, W)`: entries are flat pixel indices into the `H × W` grid, with
+padded pixels reported as `-1` in place. Count a sample's padding with
+`(order[i] == -1).sum() == H*W - h_i*w_i`. Details:
 {ref}`Workflows: reveal curves <reveal-curves>`.
 
 ## Worked notebook

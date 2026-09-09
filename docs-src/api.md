@@ -73,7 +73,7 @@ page]({ref}`landing page <symbol-index>`).
 ```
 
 ```{eval-rst}
-.. autofunction:: ruleofthumb.sentinel_mask
+.. autofunction:: ruleofthumb.lengths_to_mask
 ```
 
 ```{eval-rst}

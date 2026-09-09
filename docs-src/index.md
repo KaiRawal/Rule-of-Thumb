@@ -79,7 +79,7 @@ Every public symbol, each rendered on the [API reference](api.md):
 | `load_images` | Image-file loader |
 | `ImageBatch` | Loaded images + validity mask |
 | `pad_sequences` | Ragged text → rectangular batch |
-| `sentinel_mask` | Rebuild a mask from legacy `-1` padding |
+| `lengths_to_mask` | Token counts → boolean validity mask |
 | `pad_images` | Mixed-size images → one batch |
 | `core.RoT` | Raw tabular model |
 | `text.RoTText` | Raw text model |

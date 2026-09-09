@@ -97,18 +97,6 @@ def test_pad_sequences_utility():
     assert torch.equal(padded[1], torch.from_numpy(seqs[1]))
 
 
-def test_sentinel_mask_replicates_v01_detection():
-    from ruleofthumb.text import sentinel_mask
-
-    x = torch.randn(4, 6, 3)
-    x[:, -2:, :] = -1.0
-    x[0, 0, 0] = -1.0  # a single -1 component does NOT make the token padding
-    mask = sentinel_mask(x)  # validity mask: True marks real tokens
-    assert mask[:, :-2].all()  # real tokens are valid
-    assert not mask[:, -2:].any()  # sentinel rows are padding
-    assert mask[0, 0]
-
-
 def _multiclass_text_data():
     rng = np.random.RandomState(3)
     n, tokens, embedding = 32, 6, 4
@@ -135,7 +123,9 @@ def test_facade_multiclass_reveal_pipeline_matches_manual_counts():
     from ruleofthumb import fit_text
 
     x, lengths, y = _multiclass_text_data()
-    exp = fit_text(y, x, lengths=lengths, epochs=8, batch_size=16, learning_rate=0.01, seed=0, n_classes=3)
+    exp = fit_text(
+        y, x, mask=lengths_to_mask(lengths, x.shape[1]).numpy(), epochs=8, batch_size=16, learning_rate=0.01, seed=0, n_classes=3
+    )
     assert exp.model.classes == 3
 
     xt = torch.from_numpy(x)
@@ -163,27 +153,41 @@ def test_facade_multiclass_reveal_pipeline_matches_manual_counts():
         assert int(confusion[j].sum()) == int(sel.sum())
 
 
-def test_facade_multiclass_lengths_and_attention_mask_equivalence():
+def test_facade_mask_tensor_and_array_agree():
+    """Masks compose as torch tensors, numpy arrays or lists alike."""
     from ruleofthumb import fit_text
 
     x, lengths, y = _multiclass_text_data()
     mask = lengths_to_mask(lengths, x.shape[1])
+    kwargs = {"epochs": 4, "batch_size": 16, "learning_rate": 0.01, "seed": 0, "n_classes": 3}
+    by_tensor = fit_text(y, x, mask=mask, **kwargs)
     torch.manual_seed(0)
-    by_lengths = fit_text(y, x, lengths=lengths, epochs=4, batch_size=16, learning_rate=0.01, seed=0, n_classes=3)
-    torch.manual_seed(0)
-    by_mask = fit_text(
-        y, x, attention_mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.01, seed=0, n_classes=3
-    )
-    imp_lengths = by_lengths.get_explanation(x, lengths=lengths)
-    imp_mask = by_mask.get_explanation(x, attention_mask=mask.numpy())
-    assert np.allclose(imp_lengths, imp_mask)
+    by_array = fit_text(y, x, mask=mask.numpy(), **kwargs)
+    assert np.allclose(by_tensor.get_explanation(x, mask=mask), by_array.get_explanation(x, mask=mask.numpy()))
 
 
 def test_facade_multiclass_seed_reproducibility():
     from ruleofthumb import fit_text
 
     x, lengths, y = _multiclass_text_data()
+    mask = lengths_to_mask(lengths, x.shape[1]).numpy()
     kwargs = {"epochs": 4, "batch_size": 16, "learning_rate": 0.01, "seed": 0, "n_classes": 3}
-    exp_a = fit_text(y, x, lengths=lengths, **kwargs)
-    exp_b = fit_text(y, x, lengths=lengths, **kwargs)
-    assert np.allclose(exp_a.get_explanation(x, lengths=lengths), exp_b.get_explanation(x, lengths=lengths))
+    exp_a = fit_text(y, x, mask=mask, **kwargs)
+    exp_b = fit_text(y, x, mask=mask, **kwargs)
+    assert np.allclose(exp_a.get_explanation(x, mask=mask), exp_b.get_explanation(x, mask=mask))
+
+
+def test_facade_get_order_takes_mask_only():
+    """Text reveal entry points speak a single ``mask=`` spelling (sandbox Bug 2)."""
+    from ruleofthumb import fit_text
+
+    x, lengths, y = _multiclass_text_data()
+    mask = lengths_to_mask(lengths, x.shape[1])
+    exp = fit_text(y, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.01, seed=0, n_classes=3)
+
+    order = exp.get_order(torch.from_numpy(x), mask=mask)
+    for i, length in enumerate(lengths.tolist()):
+        assert (order[i, :length] != -1).all() and (order[i, length:] == -1).all()
+
+    with pytest.raises(TypeError):
+        exp.get_order(torch.from_numpy(x), lengths=lengths)

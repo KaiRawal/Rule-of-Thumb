@@ -100,28 +100,29 @@ importances = exp.get_explanation(X_train)  # signed, shape [N, d]; positive = e
 ### Text / token embeddings
 
 Inputs are `(N, tokens, embedding)` float arrays. Padding is explicit: pass a
-validity mask (`True` = real token) or per-sample lengths. The explainer accepts
-HuggingFace `attention_mask` tensors directly.
+boolean validity `mask` (`True` = real token). HuggingFace `attention_mask`
+tensors compose directly as `mask=`.
 
 ```python
 import numpy as np
 import ruleofthumb as rot
-from ruleofthumb.text import pad_sequences
+from ruleofthumb.text import lengths_to_mask, pad_sequences
 
 # Ragged inputs? Pad them — any fill value works, the mask carries the truth:
 sequences = [np.random.rand(t, 384).astype(np.float32) for t in (20, 14, 17, 9)]
 x, lengths = pad_sequences(sequences)                # x: (4, 20, 384)
 labels = np.array([1, 0, 1, 0], dtype=np.int64)      # e.g. LLM predictions per text
+mask = lengths_to_mask(lengths, x.shape[1]).numpy()  # (4, 20) boolean validity mask
 
-exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), lengths=lengths)
-token_importances = exp.get_explanation(x.numpy(), lengths=lengths)
+exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), mask=mask)
+token_importances = exp.get_explanation(x.numpy(), mask=mask)
 # signed, shape [N, max_tokens]: positive = evidence toward class 1; padded tokens score exactly 0
 # (for n_classes > 2 the output is per-class instead: [N, n_classes, max_tokens])
 ```
 
 Already have a rectangular batch and your own mask? Pass it directly as
-`attention_mask=...` (or a plain boolean `mask=`) to `fit_text` /
-`get_explanation`.
+`mask=` to `fit_text` / `get_explanation` / `get_order`. `score_ordering`
+takes no mask: padding is already encoded as `-1` entries in the order.
 
 Starting from raw strings? Pass them straight in — `fit_text` embeds them
 (bundled default: `answerdotai/ModernBERT-base`, overridable via
@@ -142,7 +143,7 @@ Need the intermediate arrays (e.g. decoded tokens for plotting)? Use
 ```python
 out = rot.embed_texts(["a wonderful film", "terrible pacing"])
 exp = rot.fit_text(y_outputs=labels, x_inputs=out.embeddings,
-                           attention_mask=out.attention_mask)
+                           mask=out.attention_mask)
 out.tokens  # decoded token strings, aligned with per-token importances
 ```
 
@@ -172,7 +173,12 @@ model = RoTImage(classes=2, sample_shape=(3,))
 model.fit(torch.from_numpy(x), labels, epochs=50, batch_size=2, lr=0.01, mask=mask)
 for img in images:
     single_imp = model.importance(torch.from_numpy(img[None]))
+# raw-model importances are per-element (N, K, C, H, W); get_explanation
+# reduces over classes/channels to per-pixel saliency (N, H, W)
 ```
+
+The image `get_order` preserves the spatial layout `(N, H, W)` (flat pixel
+indices, `-1` for padded pixels) — unlike tabular `(N, D)` and text `(N, T)`.
 
 Starting from image files? Pass the paths straight in — `fit_image` decodes
 them (RGB, `[0, 1]` floats), derives validity masks automatically, and every
@@ -208,7 +214,9 @@ result.trials       # every candidate with its validation score, best-first
 
 `search="grid"` enumerates a `space=` dict exhaustively; `space=` accepts any
 subset of the defaults. Works for all three modalities, including raw strings
-and image paths.
+and image paths. `n_classes` is inferred from the labels; any other factory
+keyword (`nonlinear`, `l1_penalty`, `mask`, ...) is forwarded to both the
+candidate fits and the final refit.
 
 ### Saving and loading
 
@@ -260,7 +268,7 @@ fig.savefig("waterfall.png")                      # everything returns a Figure
 
 # Text — token highlighting for Jupyter plus a static matplotlib export:
 out = rot.embed_texts(["a wonderful film", "terrible pacing"])
-imp = exp.get_explanation(out.embeddings, attention_mask=out.attention_mask)
+imp = exp.get_explanation(out.embeddings, mask=out.attention_mask)
 plot.text_html(imp[0], out.tokens[0])             # IPython-aware HTML
 plot.text_matplotlib(imp[0], out.tokens[0]).savefig("tokens.png")
 plot.word_clouds(imp, out.tokens)                 # aggregated pos/neg/combined clouds

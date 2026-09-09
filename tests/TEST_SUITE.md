@@ -34,13 +34,13 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 10 files | 121 | Synthetic tensors/arrays, no artifacts |
-| Integration `tests/integration/` | 9 files | 63 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
+| Unit `tests/test_*.py` | 10 files | 132 | Synthetic tensors/arrays, no artifacts |
+| Integration `tests/integration/` | 9 files | 58 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
 
-Per-file counts: test_core 15, test_embed 15, test_explain 19, test_image 15,
+Per-file counts: test_core 17, test_embed 14, test_explain 17, test_image 16,
 test_masks 14, test_nonlinear 15, test_persistence 6, test_plot 12,
-test_text 12, test_tune 6, gpt_pet 5, image 12, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 184.
+test_text 12, test_tune 9, gpt_pet 5, image 12, nonlinear 1, persistence 4,
+plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 190.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -262,15 +262,16 @@ unless noted.
 | `test_text_autotune_reaches_sentiment_fidelity` | best `>=0.85` (1.0); refit `>=0.85` (1.0) |
 | `test_image_autotune_reaches_binary_fidelity` | best `>=0.9` (0.9520); refit `>=0.9` (0.9360) |
 
-### `tests/test_core.py` (15)
+### `tests/test_core.py` (17)
 
 Pins for base `RoT`: loss decreases + predicts; importance shapes;
 ordering pipeline; multiclass/binary `score_ordering` incl. confusion and
-metric-conflict error; device resolution/plumbing (cpu); dropout
+metric-conflict error; swapped-points/labels and sample-count guards;
+device resolution/plumbing (cpu); dropout
 stochasticity; `mins`/`maxs` instance attrs; stable tie-break; SWA burn-in
 arg; fit hyperparameter args; fit + training-loop seeding.
 
-### `tests/test_embed.py` (15)
+### `tests/test_embed.py` (14)
 
 Pins for `embed_texts`/`TextEmbeddings`: shapes/masks/padding zeros; token
 alignment; batch invariance; truncation; tokenizer/model override rules;
@@ -278,28 +279,28 @@ device arg; empty/bad-input rejections; `DEFAULT_TEXT_MODEL`; string routing
 through facade; strings+explicit-padding rejection; array-fitted string-query
 error.
 
-### `tests/test_explain.py` (19)
+### `tests/test_explain.py` (17)
 
 Pins for `Explainer` facade: modality auto-detect/override; explanation
-shapes (tabular/text/image, binary + multiclass); signed outputs; mask
-equivalence; padding-arg/kwarg rejection; hyperparameter threading; seeding;
+shapes (tabular/text/image, binary + multiclass); signed outputs; mask-only
+text contract; padding-arg/kwarg rejection; hyperparameter threading; seeding;
 device; reveal delegation; `__version__ == "0.2.19"`; removed
 `RuleOfThumb`/`TextRuleOfThumb` absent.
 
-### `tests/test_image.py` (15)
+### `tests/test_image.py` (16)
 
 Pins for `RoTImage`/paths: importance shapes; fit/score; mask zeroing;
 mixed-size batch ≡ per-sample loop; padded fit; `pad_images`; facade binary
 pipeline with untrained conv box; padded-batch mask respect; `load_images`
-native/fixed/transform paths; path routing; path+mask rejection;
+native/fixed/transform paths; warning-free decoding; path routing; path+mask rejection;
 path-on-array-fit error.
 
 ### `tests/test_masks.py` (14)
 
-Pins for explicit-mask contract + reveal granularity: ragged text; v0.1
-sentinel equivalence; mixed-size image fit/reveal; element-granularity
+Pins for explicit-mask contract + reveal granularity: ragged text; explicit
+mask scoring reference; mixed-size image fit/reveal; element-granularity
 escape hatches (text/image); truncation defaults; unit≡element at token
-boundaries; curve lengths; unmasked ≡ v0.1; tabular granularity identity;
+boundaries; curve lengths; tabular granularity identity;
 legacy imports gone; padding utils exported.
 
 ### `tests/test_nonlinear.py` (15)
@@ -326,11 +327,12 @@ nonpositive power rejected; word clouds figure.
 
 Pins for `RoTText`: importance shapes; mask zeroing; stochastic mask
 respect; length normalisation; fit reduces loss; masked fit; `pad_sequences`;
-`sentinel_mask`; multiclass masked zeros; facade multiclass reveal counts;
-lengths≡attention-mask equivalence; seeding.
+multiclass masked zeros; facade multiclass reveal counts; mask-only
+`get_order` contract; tensor≡array mask agreement; seeding.
 
-### `tests/test_tune.py` (6)
+### `tests/test_tune.py` (9)
 
 Pins for `autotune` on synthetic data: grid enumeration; random
 n_candidates/space respect; seeding; split sizes; search beats a bad fit;
-refit accurate on all data.
+refit accurate on all data; multiclass `n_classes` inference + explicit
+override; model-kwarg forwarding (`nonlinear`).

@@ -110,3 +110,45 @@ def test_refit_explainer_is_accurate_on_all_data():
 
     preds = result.explainer.predict(torch.from_numpy(x)).cpu().numpy()
     assert float((preds == y).mean()) >= 0.95
+
+
+def _multiclass_dataset(n=150):
+    """Three-class tabular data (sandbox Bug 1 repro, scaled down)."""
+    rng = np.random.RandomState(7)
+    x = rng.rand(n, 5).astype(np.float32)
+    logits = np.stack(
+        [1.5 * x[:, 0] - 0.5 * x[:, 1], -x[:, 0] + 1.5 * x[:, 2], 1.2 * x[:, 3] - 0.4 * x[:, 4]], axis=1
+    )
+    return x, np.argmax(logits, axis=1).astype(np.int64)
+
+
+def test_autotune_infers_n_classes_for_multiclass():
+    x, y = _multiclass_dataset()
+    space = {"learning_rate": [0.05], "epochs": [4], "batch_size": [500]}
+    result = autotune(y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0)
+
+    assert result.explainer.model.classes == 3
+    assert np.isfinite(result.best_score)
+    preds = result.explainer.predict(torch.from_numpy(x)).cpu().numpy()
+    assert preds.shape == (x.shape[0],)
+
+
+def test_autotune_explicit_n_classes_override():
+    x, y = _multiclass_dataset()
+    space = {"learning_rate": [0.05], "epochs": [4], "batch_size": [500]}
+    result = autotune(
+        y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0, n_classes=3
+    )
+
+    assert result.explainer.model.classes == 3
+
+
+def test_autotune_forwards_model_kwargs():
+    x, y = _separable_dataset()
+    space = {"learning_rate": [0.05], "epochs": [4], "batch_size": [500]}
+    result = autotune(
+        y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0, nonlinear="hinge"
+    )
+
+    assert result.explainer.model.nonlinear_spec is not None
+    assert set(result.best_params) == set(space)

@@ -183,6 +183,18 @@ def test_load_images_fixed_size_resizes_and_crops(png_paths):
     assert out.mask.all()  # uniform size: every pixel is real
 
 
+def test_load_images_emits_no_warnings(png_paths):
+    """Decoding must not warn (sandbox Bug 6: read-only NumPy array)."""
+    import warnings
+
+    from ruleofthumb.image import load_images
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = load_images(png_paths)
+    assert out.images.shape == (2, 3, 4, 4)
+
+
 def test_load_images_transform_override(png_paths):
     import torch as th
 
