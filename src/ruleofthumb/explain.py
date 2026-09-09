@@ -25,6 +25,7 @@ from ruleofthumb.core import RoT
 from ruleofthumb.embed import embed_texts
 from ruleofthumb.image import RoTImage, load_images
 from ruleofthumb.text import RoTText
+from ruleofthumb.vision import DEFAULT_IMAGE_MODEL, embed_images
 
 _IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"})
 
@@ -115,7 +116,9 @@ class Explainer:
 
     Freshly fitted explainers carry ``train_agreement_`` (surrogate-vs-label
     agreement on the train inputs, ``None`` on reloaded ones); a low value
-    also emits a warning at fit time.
+    also emits a warning at fit time. Image explainers fitted from file
+    paths through a backbone record its id in ``backbone`` (``None`` for
+    raw pixels, custom modules and reloaded explainers).
     """
 
     def __init__(self, model, modality, string_embedder=None, image_loader=None):
@@ -124,6 +127,7 @@ class Explainer:
         self._string_embedder = string_embedder
         self._image_loader = image_loader
         self.train_agreement_ = None
+        self.backbone = None
 
     @property
     def modality(self):
@@ -153,7 +157,8 @@ class Explainer:
                 "pass arrays or refit from paths"
             )
         batch = self._image_loader(list(x))
-        return torch.from_numpy(batch.images).to(self._model.device), torch.from_numpy(batch.mask)
+        images = batch.maps if hasattr(batch, "maps") else batch.images
+        return torch.from_numpy(images).to(self._model.device), torch.from_numpy(batch.mask)
 
     def get_explanation(self, x_numpy, *, mask=None) -> np.ndarray:
         """Return signed importances, comparable to SHAP values.
@@ -263,6 +268,8 @@ class Explainer:
         }
         if self._modality == "text":
             config["l1_penalty"] = float(model.l1_penalty)
+        if self._modality == "image":
+            config["backbone"] = self.backbone
         if getattr(model, "nonlinear_spec", None) is not None:
             config["nonlinear"] = dict(model.nonlinear_spec)
         payload = {
@@ -310,12 +317,15 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
     modality = payload["modality"]
     config = dict(payload["config"])
     config["sample_shape"] = tuple(config["sample_shape"])
+    backbone = config.pop("backbone", None)
     classes = {"tabular": RoT, "text": RoTText, "image": RoTImage}[modality]
     model = classes(device=device, **config)
     model.load_state_dict(payload["state_dict"])
     model.mins = _from_payload_value(payload["mins"], model.device)
     model.maxs = _from_payload_value(payload["maxs"], model.device)
-    return Explainer(model, modality)
+    explainer = Explainer(model, modality)
+    explainer.backbone = backbone
+    return explainer
 
 
 def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
@@ -454,6 +464,7 @@ def fit_image(
     x_inputs,
     *,
     mask=None,
+    backbone: str | torch.nn.Module | None = "auto",
     size=None,
     transform=None,
     epochs=500,
@@ -469,29 +480,48 @@ def fit_image(
 ):
     """Fit an image :class:`Explainer` on ``(N, C, H, W)`` inputs or image file paths.
 
-    Pass a list of image file paths (PNG / JPEG / ...) and they are decoded
-    automatically (RGB, ``[0, 1]`` floats): with ``size=(height, width)``
-    every image is resized and centre-cropped to that common size; without
-    it, native sizes are kept and smaller images are zero-padded. Validity
-    masks are derived automatically — ``mask=`` must not be given alongside
-    paths. Supply ``transform=`` (a PIL Image -> tensor callable) to replace
-    the default pipeline entirely, e.g. a torchvision weights transform.
+    Pass a list of image file paths (PNG / JPEG / ...) and they are embedded
+    automatically through a frozen backbone (default
+    :data:`ruleofthumb.vision.DEFAULT_IMAGE_MODEL`): ``backbone="auto"``
+    (the default) uses the default model, ``backbone=None`` keeps raw RGB
+    pixels, and a torch module supplies a custom trunk (it receives
+    ImageNet-normalised RGB and must return ``(N, C, h, w)`` maps).
+    Backbone weights download once into the torchvision cache. With
+    ``size=(height, width)`` every image is resized and centre-cropped
+    before embedding; without it, native sizes are kept and maps are
+    zero-padded with pooled validity masks. ``mask=`` must not be given
+    alongside paths, and ``transform=`` must not be combined with a
+    backbone (the backbone owns preprocessing). ``backbone=`` applies to
+    file paths only; array inputs already live in representation space.
 
     For array inputs, pass a boolean validity ``mask`` of shape ``(N, H, W)``
     alongside padded batches (see :func:`ruleofthumb.image.pad_images`);
     masked-out pixels receive exactly zero importance.
 
     Explainers fitted from paths accept the same paths back in every public
-    method; each call re-loads the files.
+    method; each call re-loads (and re-embeds) the files. A reloaded
+    explainer consumes numeric arrays; the backbone id is recorded in
+    ``explainer.backbone`` and the save file for provenance.
     """
     image_loader = None
+    backbone_id = None
     if _is_string_batch(x_inputs):
         if mask is not None:
             raise ValueError("raw image files derive their padding automatically; pass mask=None")
-        image_loader = functools.partial(load_images, size=size, transform=transform)
+        if backbone == "auto":
+            backbone = DEFAULT_IMAGE_MODEL
+        if backbone is None:
+            image_loader = functools.partial(load_images, size=size, transform=transform)
+        else:
+            if transform is not None:
+                raise ValueError("backbone owns preprocessing; pass transform=None or backbone=None")
+            image_loader = functools.partial(embed_images, backbone=backbone, size=size)
+            backbone_id = backbone if isinstance(backbone, str) else None
         loaded = image_loader(list(x_inputs))
-        x_inputs = loaded.images
+        x_inputs = loaded.maps if hasattr(loaded, "maps") else loaded.images
         mask = torch.from_numpy(loaded.mask)
+    elif backbone is not None and backbone != "auto":
+        raise ValueError("backbone applies to file paths only; arrays already live in representation space")
     elif mask is not None:
         mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
@@ -508,6 +538,6 @@ def fit_image(
         seed=seed,
     )
     labels = _as_labels(y_outputs)
-    return _attach_fit_quality(
-        Explainer(rot, "image", image_loader=image_loader), _as_float_inputs(x_inputs), labels, mask=mask
-    )
+    explainer = Explainer(rot, "image", image_loader=image_loader)
+    explainer.backbone = backbone_id
+    return _attach_fit_quality(explainer, _as_float_inputs(x_inputs), labels, mask=mask)

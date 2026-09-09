@@ -56,7 +56,7 @@ def test_native_image_ingestion_end_to_end(pets):
     green_mass = loaded.images[:, 1].sum(axis=(1, 2))
     y = (green_mass > np.median(green_mass)).astype(np.int64)
 
-    exp = fit_image(y, paths, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED)
+    exp = fit_image(y, paths, backbone=None, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED)
 
     assert exp.modality == "image"
     imp = exp.get_explanation(paths)
@@ -75,7 +75,7 @@ def test_native_path_equals_array_path(pets):
     paths, y = _pet_paths_and_labels(pets)
     loaded = load_images(paths, size=(64, 64))
 
-    native = fit_image(y, paths, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED)
+    native = fit_image(y, paths, backbone=None, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED)
     arrays = fit_image(y, loaded.images, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED)
 
     imp_native = native.get_explanation(paths)
@@ -287,3 +287,37 @@ def test_multiclass_rich_backbone_strong_accuracy(digit_features_multiclass, ima
 
     curve = exp.score_ordering(xt, yt, order)
     assert abs(float(curve[-1]) - accuracy) < 1e-6
+
+
+def test_default_backbone_path_end_to_end(pets, tmp_path):
+    """Live default backbone: file paths -> frozen maps -> fit (Bug 12).
+
+    The only network use is the one-time backbone weight download (torchvision
+    cache); everything else runs on the committed pet JPEGs.
+    """
+    from ruleofthumb import load_explainer
+    from ruleofthumb.vision import DEFAULT_IMAGE_MODEL, embed_images
+
+    paths, y = _pet_paths_and_labels(pets)
+    dog = np.flatnonzero(y == 1)[:3]
+    cat = np.flatnonzero(y == 0)[:3]
+    sel = np.concatenate([dog, cat])
+    paths = [paths[i] for i in sel]
+    y = y[sel]
+
+    embedded = embed_images(paths, size=(64, 64))
+    assert embedded.maps.shape == (6, 576) + embedded.maps.shape[2:]
+    assert embedded.maps.dtype == np.float32
+    assert embedded.mask.shape[1:] == embedded.maps.shape[2:]
+    assert embedded.mask.dtype == bool
+    assert embedded.mask.all()  # uniform size: every map cell is real
+
+    exp = fit_image(y, paths, size=(64, 64), epochs=10, batch_size=8, learning_rate=0.05, seed=SEED)
+    assert exp.backbone == DEFAULT_IMAGE_MODEL
+    imp = exp.get_explanation(paths)
+    assert imp.shape == (6,) + embedded.maps.shape[2:]
+    assert np.isfinite(imp).all()
+
+    path = tmp_path / "maps.rotx"
+    exp.save(str(path))
+    assert load_explainer(str(path)).backbone == DEFAULT_IMAGE_MODEL

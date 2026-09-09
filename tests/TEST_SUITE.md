@@ -34,13 +34,13 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 10 files | 139 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 11 files | 145 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 9 files | 58 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
 
 Per-file counts: test_core 18, test_embed 14, test_explain 23, test_image 16,
-test_masks 14, test_nonlinear 15, test_persistence 6, test_plot 12,
-test_text 12, test_tune 9, gpt_pet 5, image 12, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 197.
+test_masks 14, test_nonlinear 15, test_persistence 6, test_plot 13,
+test_text 12, test_tune 9, test_vision 5, gpt_pet 5, image 13, nonlinear 1, persistence 4,
+plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 204.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -169,7 +169,7 @@ unless noted.
 | `test_heatmaps_match_reference_explanations` | Shape (20,7,7); corr min `>=0.95`, mean `>=0.99`; both signs present |
 | `test_dog_images_highlight_the_dog_direction` | Mean dog-mass dogs>cats; corr(dog-mass, labels) `>=0.9` |
 
-### `tests/integration/test_image_integration.py` (12)
+### `tests/integration/test_image_integration.py` (13)
 
 | Test | Checks |
 | --- | --- |
@@ -185,6 +185,7 @@ unless noted.
 | `test_coordinate_channels_restore_multiclass_capacity` | Accuracy `>=maj+0.15` (measured 0.324); `>=raw+0.15`; reveal/confusion consistent; reproducible |
 | `test_rich_backbone_feature_shape` | Live MobileNet digits maps `(500,576,7,7)`; finite; N>49; 10 classes |
 | `test_multiclass_rich_backbone_strong_accuracy` | Accuracy `>=0.8` (measured 0.994), `>=maj+0.5`, `>=raw+0.5`; `>=8/10` classes predicted; confusion/reveal consistent |
+| `test_default_backbone_path_end_to_end` | Live default backbone paths→maps→fit; 576ch maps; backbone id saved/loaded |
 
 ### `tests/integration/test_nonlinear_integration.py` (1)
 
@@ -320,12 +321,12 @@ round-trip.
 Pins for save/load: round-trip identical outputs (tabular/text/image);
 `mins`/`maxs` restored; `device=` on load; foreign files rejected.
 
-### `tests/test_plot.py` (12)
+### `tests/test_plot.py` (13)
 
 Pins for `rot.plot`: single-row figures (waterfall/force/decision);
 batch figures (bar/beeswarm); values/base use class bias; HTML sign colours;
 max-tokens truncation; matplotlib text figure; saliency with/without image;
-nonpositive power rejected; word clouds figure.
+nonpositive power rejected; word clouds figure + single-sign panels.
 
 ### `tests/test_text.py` (12)
 
@@ -340,3 +341,10 @@ Pins for `autotune` on synthetic data: grid enumeration; random
 n_candidates/space respect; seeding; split sizes; search beats a bad fit;
 refit accurate on all data; multiclass `n_classes` inference + explicit
 override; model-kwarg forwarding (`nonlinear`).
+
+### `tests/test_vision.py` (5)
+
+Pins for the image backbone path: stub-trunk map shapes + pooled mask
+counts; stub fit end-to-end with `backbone` provenance `None`;
+`backbone=None` pixel parity; backbone+transform conflict; save/load
+backbone-id round-trip.

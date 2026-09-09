@@ -179,23 +179,31 @@ for img in images:
 
 The image `get_order` preserves the spatial layout `(N, H, W)` (flat pixel
 indices, `-1` for padded pixels) — unlike tabular `(N, D)` and text `(N, T)`.
-
-Starting from image files? Pass the paths straight in — `fit_image` decodes
-them (RGB, `[0, 1]` floats), derives validity masks automatically, and every
-explainer method accepts the same paths back:
+Starting from image files? Pass the paths straight in — `fit_image` embeds
+them through a frozen backbone by default (`mobilenet_v3_small`; weights
+download once), derives validity masks automatically, and every explainer
+method accepts the same paths back:
 
 ```python
 import ruleofthumb as rot
 
 paths = ["cat.jpg", "dog.jpg"]
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths)          # native sizes, padded
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))  # resize + centre-crop
-imp = exp.get_explanation(paths)   # signed, shape [N, H, W]
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths)                        # 576-channel maps
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))         # resize + centre-crop first
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths, backbone=None)         # raw RGB pixels instead
+imp = exp.get_explanation(paths)   # signed, shape [N, h, w] on the map grid
 ```
 
+Prefer maps: raw pixels pool to per-channel ink mass, which caps fidelity
+on focal tasks (0.61 on real pathology vs 0.95 on backbone maps). A torch
+module supplies a custom trunk; `transform=` cannot be combined with a
+backbone. The backbone id is recorded in `explainer.backbone` and the save
+file; reloaded explainers consume map arrays.
+
 Need custom preprocessing (e.g. ImageNet normalisation for a torchvision
-black box)? Supply `transform=` (a PIL Image → tensor callable), or use
-`rot.load_images(paths, ...)` directly to inspect `.images` / `.mask`.
+black box)? Supply `transform=` (a PIL Image → tensor callable) with
+`backbone=None`, or use `rot.load_images(paths, ...)` directly to inspect
+`.images` / `.mask`.
 
 ### Automatic hyperparameter tuning
 

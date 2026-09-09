@@ -59,6 +59,25 @@ black box)? Supply `transform=` (a PIL Image → tensor callable), or use
 `rot.load_images(paths, ...)` directly to inspect `.images` /
 `.mask`.
 
+## Default backbone
+
+File paths embed through a frozen backbone by default
+(`mobilenet_v3_small`, weights download once into the torchvision cache) —
+pass `backbone=None` for raw RGB pixels instead:
+
+```python
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths)                 # 576-channel maps
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths, backbone=None)  # raw pixels
+```
+
+Prefer maps: raw pixels pool to per-channel ink mass, which caps fidelity
+on focal tasks (0.61 on real pathology vs 0.95 on backbone maps — see
+[Capacity](capacity.md)). A torch module supplies a custom trunk (it
+receives ImageNet-normalised RGB); `transform=` cannot be combined with a
+backbone. Use `rot.embed_images(paths, ...)` directly to inspect `.maps` /
+`.mask`. The backbone id is recorded in `explainer.backbone` and the save
+file; reloaded explainers consume map arrays.
+
 ## Reveal pipeline
 
 One reveal step covers a whole **pixel** (channels revealed together);

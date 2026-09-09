@@ -258,7 +258,8 @@ def word_clouds(importance_rows, tokens_lists, *, stopwords=None, width=800, hei
     Token weights are averaged across documents; a word appears in the red
     (positive) cloud when its mean weight is positive and in the blue
     (negative) cloud otherwise. Departs from the legacy green/red cloud
-    colours for consistency with the rest of the module.
+    colours for consistency with the rest of the module. One-sided
+    importances render fine: the empty panel shows a "no tokens" label.
     """
     from wordcloud import STOPWORDS, WordCloud
 
@@ -285,10 +286,6 @@ def word_clouds(importance_rows, tokens_lists, *, stopwords=None, width=800, hei
             relative_scaling=0.5,
             color_func=colour_func,
         )
-        if not frequencies:
-            placeholder = WordCloud(width=width, height=height, background_color="white")
-            placeholder.generate_from_text("")
-            return placeholder
         return cloud.generate_from_frequencies(frequencies)
 
     def fixed(colour):
@@ -298,15 +295,18 @@ def word_clouds(importance_rows, tokens_lists, *, stopwords=None, width=800, hei
         return "#d62728" if means.get(word, 0.0) >= 0 else "#1f77b4"
 
     figure, axes = plt.subplots(1, 3, figsize=(15, 5))
-    for axis, (frequencies, colour_func, title) in zip(
+    for axis, (frequencies, colour_func, title, empty_label) in zip(
         axes,
         [
-            (negative, fixed("#1f77b4"), "against the class"),
-            (positive, fixed("#d62728"), "toward the class"),
-            (combined, by_sign, "combined"),
+            (negative, fixed("#1f77b4"), "against the class", "no tokens against the class"),
+            (positive, fixed("#d62728"), "toward the class", "no tokens toward the class"),
+            (combined, by_sign, "combined", "no tokens"),
         ],
     ):
-        axis.imshow(make(frequencies, colour_func).to_array())
+        if frequencies:
+            axis.imshow(make(frequencies, colour_func).to_array())
+        else:
+            axis.text(0.5, 0.5, empty_label, ha="center", va="center", fontsize=12)
         axis.set_title(title, fontsize=10)
         axis.axis("off")
     figure.tight_layout()

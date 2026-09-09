@@ -105,3 +105,13 @@ def test_word_clouds_returns_figure():
     tokens_lists = [["good", "bad"], ["good", "great"]]
     fig = plot.word_clouds(importance_rows, tokens_lists, seed=0)
     assert isinstance(fig, Figure)
+
+
+def test_word_clouds_single_sign_renders():
+    """Bug 11: one-sided importances must not crash the empty panel."""
+    tokens_lists = [["t0", "t1", "t2", "t3", "t4"]]
+    all_positive = [np.array([0.04, 0.05, 0.04, 0.04, 0.03])]
+    assert isinstance(plot.word_clouds(all_positive, tokens_lists, seed=0), Figure)
+    all_negative = [-row for row in all_positive]
+    assert isinstance(plot.word_clouds(all_negative, tokens_lists, seed=0), Figure)
+    plt.close("all")

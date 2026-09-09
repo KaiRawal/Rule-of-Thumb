@@ -59,6 +59,18 @@ exp = rot.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
 imp = exp.get_explanation(x.numpy(), mask=mask.numpy())
 ```
 
+Starting from image files? Paths embed through a frozen backbone by
+default (`mobilenet_v3_small`) — raw pixels pool to ink mass and cap
+fidelity on focal tasks, so prefer maps (pass `backbone=None` for pixels):
+
+```python
+import ruleofthumb as rot
+
+paths = ["cat.jpg", "dog.jpg"]
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths)
+imp = exp.get_explanation(paths)   # signed, shape [N, h, w] on the map grid
+```
+
 Image file paths work directly too — see [Image](image.md) and the
 `notebooks/03_image_quickstart.ipynb` notebook.
 

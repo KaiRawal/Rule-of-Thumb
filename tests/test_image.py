@@ -213,7 +213,7 @@ def test_fit_routes_image_paths_to_image(png_paths):
     from ruleofthumb import fit
 
     y = np.array([0, 1])
-    exp = fit(y, png_paths, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
     assert exp.modality == "image"
     assert exp.get_explanation(png_paths).shape == (2, 2, 2)
 
@@ -222,7 +222,7 @@ def test_facade_methods_accept_paths(png_paths):
     from ruleofthumb import fit_image
 
     y = np.array([0, 1])
-    exp = fit_image(y, png_paths, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit_image(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
 
     imp = exp.get_explanation(png_paths)
     assert imp.shape == (2, 2, 2)

@@ -66,6 +66,19 @@ page]({ref}`landing page <symbol-index>`).
    :members:
 ```
 
+```{eval-rst}
+.. autofunction:: ruleofthumb.embed_images
+```
+
+```{eval-rst}
+.. autoclass:: ruleofthumb.ImageEmbeddings
+   :members:
+```
+
+```{eval-rst}
+.. autodata:: ruleofthumb.DEFAULT_IMAGE_MODEL
+```
+
 ## Utilities
 
 ```{eval-rst}
