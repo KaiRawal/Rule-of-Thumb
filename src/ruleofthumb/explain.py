@@ -257,8 +257,11 @@ class Explainer:
         Saves the underlying RoT model's weights and configuration; use
         :func:`load_explainer` to restore it. Native string / file-path
         ingestion is not persisted — a reloaded explainer consumes numeric
-        arrays.
+        arrays. The payload records the package version and loads only
+        under exactly that version.
         """
+        from ruleofthumb import __version__
+
         model = self._model
         config = {
             "classes": int(model.classes),
@@ -274,6 +277,7 @@ class Explainer:
             config["nonlinear"] = dict(model.nonlinear_spec)
         payload = {
             "ruleofthumb_format": _PERSISTENCE_FORMAT,
+            "ruleofthumb_version": __version__,
             "modality": self._modality,
             "config": config,
             "state_dict": {key: value.detach().cpu() for key, value in model.state_dict().items()},
@@ -314,6 +318,15 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
     payload = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(payload, dict) or payload.get("ruleofthumb_format") != _PERSISTENCE_FORMAT:
         raise ValueError(f"{path!r} is not a ruleofthumb explainer file")
+    from ruleofthumb import __version__
+
+    saved = payload.get("ruleofthumb_version")
+    if saved != __version__:
+        detail = f"saved with ruleofthumb-rot {saved}" if saved is not None else "saved before version stamping"
+        raise ValueError(
+            f"{path!r} was {detail} but this is ruleofthumb-rot {__version__}; "
+            "artifact versions must match exactly — refit and re-save under the running version"
+        )
     modality = payload["modality"]
     config = dict(payload["config"])
     config["sample_shape"] = tuple(config["sample_shape"])

@@ -34,13 +34,13 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 11 files | 145 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 11 files | 147 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 9 files | 58 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
 
 Per-file counts: test_core 18, test_embed 14, test_explain 23, test_image 16,
-test_masks 14, test_nonlinear 15, test_persistence 6, test_plot 13,
+test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 13,
 test_text 12, test_tune 9, test_vision 5, gpt_pet 5, image 13, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 204.
+plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 206.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -316,10 +316,11 @@ additive decomposition (K=2/3 × rbf/dict); masked positions stay zero; ring
 separation linear cannot do (rbf + hinge); reveal pipeline; persistence
 round-trip.
 
-### `tests/test_persistence.py` (6)
+### `tests/test_persistence.py` (8)
 
 Pins for save/load: round-trip identical outputs (tabular/text/image);
-`mins`/`maxs` restored; `device=` on load; foreign files rejected.
+`mins`/`maxs` restored; `device=` on load; foreign files rejected;
+exact version-match enforcement (mismatch + missing stamp rejected).
 
 ### `tests/test_plot.py` (13)
 

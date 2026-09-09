@@ -70,3 +70,28 @@ def test_foreign_file_rejected(tmp_path):
     torch.save({"unrelated": 1}, path)
     with pytest.raises(ValueError, match="ruleofthumb explainer"):
         load_explainer(str(path))
+
+
+def test_version_mismatch_rejected(tmp_path, monkeypatch):
+    import ruleofthumb
+
+    x, _, y = _dataset("tabular")
+    exp = _fit("tabular", x, None, y)
+    path = tmp_path / "explainer.rotx"
+    monkeypatch.setattr(ruleofthumb, "__version__", "9.9.9")
+    exp.save(str(path))
+    monkeypatch.undo()
+    with pytest.raises(ValueError, match="9.9.9"):
+        load_explainer(str(path))
+
+
+def test_missing_version_rejected(tmp_path):
+    x, _, y = _dataset("tabular")
+    exp = _fit("tabular", x, None, y)
+    path = tmp_path / "explainer.rotx"
+    exp.save(str(path))
+    payload = torch.load(path, weights_only=True)
+    del payload["ruleofthumb_version"]
+    torch.save(payload, path)
+    with pytest.raises(ValueError, match="version"):
+        load_explainer(str(path))
