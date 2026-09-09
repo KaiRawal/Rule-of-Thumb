@@ -86,6 +86,7 @@ class RoTText(RoT):
         return keep[:, None, :, None] * imp
 
     def score(self, points, mask=None):
+        """Length-normalised class scores on the host: always CPU."""
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
         imp = self.importance(points, mask=mask).detach()
@@ -100,7 +101,7 @@ class RoTText(RoT):
 
         score = response_mean.reshape(response_mean.shape[0], response_mean.shape[1], -1).sum(-1)
         score += self.g[None, :]
-        return score
+        return score.cpu()
 
     def loss(self, points, target, mask=None):
         response = self.stochastic_importance(points, mask=mask)

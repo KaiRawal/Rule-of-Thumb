@@ -251,3 +251,15 @@ def test_score_ordering_rejects_mismatched_sample_counts(tabular_data):
 
     with pytest.raises(ValueError, match="same number of samples"):
         model.score_ordering(xt[:10], y, order)
+
+
+def test_inference_methods_return_host_side_tensors(tabular_data):
+    """score/predict/ordered_predict are host-side regardless of device (sandbox Bug 8)."""
+    x, y = tabular_data
+    model = RoT(2, (5,), device="cpu")
+    model.fit(torch.from_numpy(x), y, epochs=4, batch_size=32, lr=0.05)
+    xt = torch.from_numpy(x)
+    assert model.score(xt).device.type == "cpu"
+    assert model.predict(xt).device.type == "cpu"
+    order = model.get_order(xt)
+    assert model.ordered_predict(xt, order).device.type == "cpu"

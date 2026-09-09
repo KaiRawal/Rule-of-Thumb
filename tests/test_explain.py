@@ -278,3 +278,42 @@ def test_package_exports():
         assert hasattr(rot, name)
     for removed in ("RuleOfThumb", "TextRuleOfThumb"):
         assert not hasattr(rot, removed)
+
+
+def _mps_available():
+    mps = getattr(torch.backends, "mps", None)
+    return mps is not None and mps.is_available()
+
+
+@pytest.mark.skipif(not _mps_available(), reason="MPS device not available")
+def test_inference_returns_host_side_on_mps(tabular_data):
+    """Sandbox Bug 8 repro: predict/score must survive np.asarray(...) on MPS."""
+    import ruleofthumb as rot
+
+    x, y = tabular_data
+    exp = rot.fit(y, x, modality="tabular", epochs=4, batch_size=32, learning_rate=0.05, seed=0, device="mps")
+    assert exp.model.a.device.type == "mps"  # training really ran on MPS
+
+    preds = np.asarray(exp.predict(torch.from_numpy(x)))
+    assert preds.shape == (x.shape[0],)
+    assert exp.score(torch.from_numpy(x)).device.type == "cpu"
+    order = exp.get_order(torch.from_numpy(x))
+    assert exp.ordered_predict(torch.from_numpy(x), order).device.type == "cpu"
+
+
+def test_factories_reject_out_of_range_labels():
+    """A 1000-class head against n_classes=2 must fail clearly, not in torch (Bug 1 follow-up)."""
+    from ruleofthumb import fit_image, fit_tabular, fit_text
+
+    rng = np.random.RandomState(0)
+    y_bad = np.array([0, 1, 549, 2, 0, 1])
+    with pytest.raises(ValueError, match="n_classes"):
+        fit_tabular(y_bad, rng.rand(6, 3).astype(np.float32), epochs=1, batch_size=6)
+    with pytest.raises(ValueError, match="n_classes"):
+        fit_text(y_bad, rng.rand(6, 4, 3).astype(np.float32), epochs=1, batch_size=6)
+    with pytest.raises(ValueError, match="n_classes"):
+        fit_image(y_bad, rng.rand(6, 2, 4, 4).astype(np.float32), epochs=1, batch_size=6)
+    with pytest.raises(ValueError, match="n_classes"):
+        fit_tabular(np.array([0, -1]), rng.rand(2, 3).astype(np.float32), epochs=1, batch_size=2)
+    with pytest.raises(ValueError, match="non-empty"):
+        fit_tabular(np.array([], dtype=np.int64), rng.rand(0, 3).astype(np.float32), epochs=1, batch_size=6)

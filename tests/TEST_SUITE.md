@@ -34,13 +34,13 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 10 files | 132 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 10 files | 135 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 9 files | 58 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
 
-Per-file counts: test_core 17, test_embed 14, test_explain 17, test_image 16,
+Per-file counts: test_core 18, test_embed 14, test_explain 19, test_image 16,
 test_masks 14, test_nonlinear 15, test_persistence 6, test_plot 12,
 test_text 12, test_tune 9, gpt_pet 5, image 12, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 190.
+plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 193.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -262,11 +262,12 @@ unless noted.
 | `test_text_autotune_reaches_sentiment_fidelity` | best `>=0.85` (1.0); refit `>=0.85` (1.0) |
 | `test_image_autotune_reaches_binary_fidelity` | best `>=0.9` (0.9520); refit `>=0.9` (0.9360) |
 
-### `tests/test_core.py` (17)
+### `tests/test_core.py` (18)
 
 Pins for base `RoT`: loss decreases + predicts; importance shapes;
 ordering pipeline; multiclass/binary `score_ordering` incl. confusion and
 metric-conflict error; swapped-points/labels and sample-count guards;
+host-side inference tensors;
 device resolution/plumbing (cpu); dropout
 stochasticity; `mins`/`maxs` instance attrs; stable tie-break; SWA burn-in
 arg; fit hyperparameter args; fit + training-loop seeding.
@@ -279,11 +280,13 @@ device arg; empty/bad-input rejections; `DEFAULT_TEXT_MODEL`; string routing
 through facade; strings+explicit-padding rejection; array-fitted string-query
 error.
 
-### `tests/test_explain.py` (17)
+### `tests/test_explain.py` (19)
 
 Pins for `Explainer` facade: modality auto-detect/override; explanation
 shapes (tabular/text/image, binary + multiclass); signed outputs; mask-only
-text contract; padding-arg/kwarg rejection; hyperparameter threading; seeding;
+text contract; padding-arg/kwarg rejection; out-of-range/empty label
+rejection; host-side inference on MPS (skipped without MPS);
+hyperparameter threading; seeding;
 device; reveal delegation; `__version__ == "0.2.19"`; removed
 `RuleOfThumb`/`TextRuleOfThumb` absent.
 

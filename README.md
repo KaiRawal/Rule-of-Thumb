@@ -301,9 +301,12 @@ Hello-world examples on dummy data — no downloads or GPUs needed:
 All three RoT models and both explainer wrappers accept `device=`. The
 default (`device=None`) auto-detects the best available backend
 (CUDA → MPS → CPU). Fit and inference move inputs to the model's device
-automatically; raw-model methods (`score`, `importance`, ...) return tensors
-on the model's device, while the wrappers' `get_explanation` always returns
-host-side numpy arrays.
+automatically; every inference entry point (`score`, `predict`,
+`ordered_predict`, `score_ordering`, `get_order`, `get_explanation`)
+returns host-side results (CPU tensors or numpy arrays) regardless of
+`device`, so `np.asarray(exp.predict(X))` works everywhere. Only the
+training internals (`importance`, `stochastic_importance`,
+`training_loop`) stay on the model's device.
 
 ```python
 exp = rot.fit(y_outputs=labels, x_inputs=X, device="cuda")  # or "mps", "cpu", ...

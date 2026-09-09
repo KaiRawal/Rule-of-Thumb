@@ -188,12 +188,14 @@ class RoT(torch.nn.Module):
         return list(self.swa_model.children())[0]  # noqa: RUF015 (kept verbatim from source)
 
     def score(self, points, mask=None):
+        """Class scores on the host: the returned tensor is always CPU."""
         imp = self.importance(points, mask=mask).detach()
         score = imp.reshape(imp.shape[0], imp.shape[1], -1).sum(-1)
         score += self.g[None, :]
-        return score
+        return score.cpu()
 
     def predict(self, points, mask=None):
+        """Predicted classes on the host: the returned tensor is always CPU."""
         score = self.score(points, mask=mask)
         return score.argmax(1)
 
@@ -221,6 +223,9 @@ class RoT(torch.nn.Module):
         past its own reveal end are filled with ``-1``; the result spans
         ``max_true_units + 1`` steps. ``include_padded=True`` keeps every
         step of the rectangular input order.
+
+        The returned predictions live on the host (always CPU) regardless of
+        the model's device.
         """
         imp = self.importance(points).detach()
         n = imp.shape[0]
@@ -263,7 +268,7 @@ class RoT(torch.nn.Module):
             cols = np.arange(pred.shape[1])[None, :]
             exhausted = cols > np.asarray(reveal_counts)[:, None]
             pred[torch.from_numpy(exhausted).to(self.device)] = -1
-        return pred
+        return pred.cpu()
 
     def get_order(self, points, mask=None, granularity="unit"):
         """Rank reveal units by absolute importance, most important first.

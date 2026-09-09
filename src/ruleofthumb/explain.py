@@ -46,6 +46,20 @@ def _as_labels(y_outputs):
     return torch.as_tensor(np.asarray(y_outputs)).flatten()
 
 
+def _check_label_range(labels, n_classes):
+    """Fail clearly when labels fall outside ``[0, n_classes)`` instead of leaking a torch indexing error."""
+    if labels.numel() == 0:
+        raise ValueError("y_outputs must be non-empty")
+    lo, hi = int(labels.min()), int(labels.max())
+    if lo < 0 or hi >= n_classes:
+        bad = lo if lo < 0 else hi
+        raise ValueError(
+            f"labels contain class {bad} but n_classes={n_classes}; pass the matching n_classes "
+            "or remap the labels (e.g. binary-vs-rest) before fitting"
+        )
+    return labels
+
+
 class Explainer:
     """Fitted Rule-of-Thumb explainer.
 
@@ -305,10 +319,11 @@ def fit_tabular(
     nonlinear=None,
 ):
     """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs."""
+    labels = _check_label_range(_as_labels(y_outputs), n_classes)
     model = RoT(n_classes, (x_inputs.shape[1],), dropout_rate=dropout_rate, device=device, nonlinear=nonlinear)
     model.fit(
         _as_float_inputs(x_inputs),
-        _as_labels(y_outputs),
+        labels,
         epochs=epochs,
         batch_size=batch_size,
         lr=learning_rate,
@@ -375,7 +390,7 @@ def fit_text(
     )
     rot.fit(
         _as_float_inputs(x_inputs),
-        _as_labels(y_outputs),
+        _check_label_range(_as_labels(y_outputs), n_classes),
         epochs=epochs,
         batch_size=batch_size,
         lr=learning_rate,
@@ -435,7 +450,7 @@ def fit_image(
     rot = RoTImage(n_classes, (x_inputs.shape[1],), dropout_rate=dropout_rate, device=device, nonlinear=nonlinear)
     rot.fit(
         _as_float_inputs(x_inputs),
-        _as_labels(y_outputs),
+        _check_label_range(_as_labels(y_outputs), n_classes),
         epochs=epochs,
         batch_size=batch_size,
         lr=learning_rate,

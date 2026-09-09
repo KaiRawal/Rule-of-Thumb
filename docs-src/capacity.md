@@ -60,3 +60,21 @@ sentiment) and rich pretrained embeddings stay strong.
 4. The deferred opt-in per-location variant (unshared weights) is tracked
    in `ToDo.md` item 16 — only reach for it if raw-input multiclass is
    required.
+
+## Many-class heads
+
+Explaining a pretrained classifier with hundreds of classes (e.g. a
+1000-way ImageNet head) rarely means fitting a 1000-way surrogate: that is
+`2·K·C` parameters, and out-of-distribution inputs tend to collapse onto a
+single predicted class anyway. Remap the black-box labels first — either
+binary-vs-rest (`y == target_class`) or a top-`k` subset — then fit (and
+autotune) on the remapped labels; `n_classes` infers itself from them:
+
+```python
+binary = (black_box_labels == 283).astype(np.int64)  # Persian-cat-vs-rest
+exp = rot.fit_image(y_outputs=binary, x_inputs=images, mask=mask)
+result = rot.autotune(y_outputs=binary, x_inputs=images, mask=mask, seed=0)
+```
+
+Passing labels outside `[0, n_classes)` fails fast with a `ValueError`
+naming the offending class, instead of a torch indexing error.
