@@ -4,7 +4,7 @@ Binary: breast-cancer features explained through a fitted LogisticRegression.
 Multiclass: flattened digit images (10 classes) through a fitted RandomForest.
 
 All black boxes are committed artifacts; only the RoT explainer is fitted
-live, exercising the :func:`ruleofthumb.fit_tabular` facade end to end.
+live, exercising the :func:`rot.fit_tabular` facade end to end.
 """
 
 import numpy as np

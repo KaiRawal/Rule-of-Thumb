@@ -7,7 +7,7 @@
 
 Rule of Thumb (RoT): explaining AI systems using partial information.
 
-Documentation: https://ruleofthumb.readthedocs.io/ — full guides live in `docs-src/` (Sphinx + MyST, `docs-src/conf.py`); the API reference is rendered from docstrings and the notebooks are re-executed on every docs build.
+Documentation: https://rot.readthedocs.io/ — full guides live in `docs-src/` (Sphinx + MyST, `docs-src/conf.py`); the API reference is rendered from docstrings and the notebooks are re-executed on every docs build.
 
 RoT trains a simple, transparent surrogate ("rule of thumb") on partial
 observations of a black-box model's behaviour. The surrogate attributes the
@@ -18,14 +18,14 @@ predictions.
 This package consolidates the three research variants of RoT into one
 installable library:
 
-- **Tabular** (`ruleofthumb.fit_tabular`): vector inputs, one importance
+- **Tabular** (`rot.fit_tabular`): vector inputs, one importance
   weight per feature.
-- **Text / LLM embeddings** (`ruleofthumb.fit_text`): token-by-embedding
+- **Text / LLM embeddings** (`rot.fit_text`): token-by-embedding
   inputs with padding masks and length-normalised scores.
-- **Images** (`ruleofthumb.fit_image`): importance shared across spatial
+- **Images** (`rot.fit_image`): importance shared across spatial
   locations of CNN feature maps.
 
-`ruleofthumb.fit` auto-detects the modality from the input shape; all
+`rot.fit` auto-detects the modality from the input shape; all
 factories return a fitted `Explainer`.
 
 ## Install
@@ -34,8 +34,12 @@ Requires Python >= 3.9. A single install ships everything (core + plotting +
 LLM/vision helpers):
 
 ```bash
-pip install ruleofthumb
+pip install ruleofthumb-rot
 ```
+
+Code imports the package as `ruleofthumb` (conventionally `import
+ruleofthumb as rot`); only the distribution name carries the `-rot`
+suffix.
 
 Or from this repository:
 
@@ -71,12 +75,12 @@ the surrogate and returns per-feature importances.
 
 ```python
 import numpy as np
-import ruleofthumb
+import ruleofthumb as rot
 
 X_train = np.random.rand(1000, 4).astype(np.float32)
 black_box_probs = (X_train[:, 0] > 0.5).astype(np.int64)  # e.g. model.predict(X_train)
 
-exp = ruleofthumb.fit(y_outputs=black_box_probs, x_inputs=X_train)   # or fit_tabular(...)
+exp = rot.fit(y_outputs=black_box_probs, x_inputs=X_train)   # or fit_tabular(...)
 importances = exp.get_explanation(X_train)  # signed, shape [N, d]; positive = evidence toward class 1
 ```
 
@@ -88,7 +92,7 @@ HuggingFace `attention_mask` tensors directly.
 
 ```python
 import numpy as np
-import ruleofthumb
+import ruleofthumb as rot
 from ruleofthumb.text import pad_sequences
 
 # Ragged inputs? Pad them — any fill value works, the mask carries the truth:
@@ -96,7 +100,7 @@ sequences = [np.random.rand(t, 384).astype(np.float32) for t in (20, 14, 17, 9)]
 x, lengths = pad_sequences(sequences)                # x: (4, 20, 384)
 labels = np.array([1, 0, 1, 0], dtype=np.int64)      # e.g. LLM predictions per text
 
-exp = ruleofthumb.fit_text(y_outputs=labels, x_inputs=x.numpy(), lengths=lengths)
+exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), lengths=lengths)
 token_importances = exp.get_explanation(x.numpy(), lengths=lengths)
 # signed, shape [N, max_tokens]: positive = evidence toward class 1; padded tokens score exactly 0
 # (for n_classes > 2 the output is per-class instead: [N, n_classes, max_tokens])
@@ -112,19 +116,19 @@ Starting from raw strings? Pass them straight in — `fit_text` embeds them
 method accepts the same strings back:
 
 ```python
-import ruleofthumb
+import ruleofthumb as rot
 
-exp = ruleofthumb.fit_text(y_outputs=labels, x_inputs=["a wonderful film", "terrible pacing"])
+exp = rot.fit_text(y_outputs=labels, x_inputs=["a wonderful film", "terrible pacing"])
 token_importances = exp.get_explanation(["a wonderful film", "terrible pacing"])
 order = exp.get_order(["a wonderful film", "terrible pacing"])   # reveal pipeline works on strings too
 ```
 
 Need the intermediate arrays (e.g. decoded tokens for plotting)? Use
-`ruleofthumb.embed_texts` directly:
+`rot.embed_texts` directly:
 
 ```python
-out = ruleofthumb.embed_texts(["a wonderful film", "terrible pacing"])
-exp = ruleofthumb.fit_text(y_outputs=labels, x_inputs=out.embeddings,
+out = rot.embed_texts(["a wonderful film", "terrible pacing"])
+exp = rot.fit_text(y_outputs=labels, x_inputs=out.embeddings,
                            attention_mask=out.attention_mask)
 out.tokens  # decoded token strings, aligned with per-token importances
 ```
@@ -137,7 +141,7 @@ spatial locations. Mixed-size batches are supported two ways:
 ```python
 import numpy as np
 import torch
-import ruleofthumb
+import ruleofthumb as rot
 from ruleofthumb.image import pad_images
 
 images = [np.random.rand(3, h, w).astype(np.float32) for h, w in [(32, 32), (28, 40)]]
@@ -145,7 +149,7 @@ labels = torch.randint(0, 2, (2,))
 
 # Option A: pad into one batch, pass the validity mask, use the explainer
 x, mask = pad_images(images)                          # x: (2, 3, 32, 40); mask: (2, 32, 40)
-exp = ruleofthumb.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
+exp = rot.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
 imp = exp.get_explanation(x.numpy(), mask=mask.numpy())  # signed, shape [N, H, W]; padded pixels score exactly 0
 
 # Option B: loop over unpadded samples one at a time with the raw model
@@ -162,27 +166,27 @@ them (RGB, `[0, 1]` floats), derives validity masks automatically, and every
 explainer method accepts the same paths back:
 
 ```python
-import ruleofthumb
+import ruleofthumb as rot
 
 paths = ["cat.jpg", "dog.jpg"]
-exp = ruleofthumb.fit_image(y_outputs=labels, x_inputs=paths)          # native sizes, padded
-exp = ruleofthumb.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))  # resize + centre-crop
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths)          # native sizes, padded
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))  # resize + centre-crop
 imp = exp.get_explanation(paths)   # signed, shape [N, H, W]
 ```
 
 Need custom preprocessing (e.g. ImageNet normalisation for a torchvision
 black box)? Supply `transform=` (a PIL Image → tensor callable), or use
-`ruleofthumb.load_images(paths, ...)` directly to inspect `.images` / `.mask`.
+`rot.load_images(paths, ...)` directly to inspect `.images` / `.mask`.
 
 ### Automatic hyperparameter tuning
 
-`ruleofthumb.autotune` searches the training hyperparameters
+`rot.autotune` searches the training hyperparameters
 (`learning_rate`, `batch_size`, `epochs`, `dropout_rate`, `weight_decay`)
 with a seeded validation split, scores candidates by held-out reveal
 fidelity, and returns the winner refit on all data:
 
 ```python
-result = ruleofthumb.autotune(y_outputs=labels, x_inputs=x, search="random",
+result = rot.autotune(y_outputs=labels, x_inputs=x, search="random",
                               n_candidates=8, seed=0)
 result.explainer    # best config refit on all data — use like any explainer
 result.best_params  # winning hyperparameters
@@ -200,7 +204,7 @@ Fitted explainers round-trip through `Explainer.save` / `load_explainer`
 
 ```python
 exp.save("explainer.rotx")
-loaded = ruleofthumb.load_explainer("explainer.rotx", device="cpu")
+loaded = rot.load_explainer("explainer.rotx", device="cpu")
 np.allclose(exp.get_explanation(x), loaded.get_explanation(x))  # identical
 ```
 
@@ -216,9 +220,9 @@ elementwise response function `s` inside the additive model
 curves with a parameter budget independent of input size:
 
 ```python
-exp = ruleofthumb.fit_tabular(y, x, nonlinear="rbf")            # Gaussian bumps
-exp = ruleofthumb.fit_text(y, texts, nonlinear="hinge")         # SELU hinges
-exp = ruleofthumb.fit_image(y, paths, nonlinear={"type": "rbf", "n_bases": 32})
+exp = rot.fit_tabular(y, x, nonlinear="rbf")            # Gaussian bumps
+exp = rot.fit_text(y, texts, nonlinear="hinge")         # SELU hinges
+exp = rot.fit_image(y, paths, nonlinear={"type": "rbf", "n_bases": 32})
 ```
 
 Both responses are residual and zero-initialised, so an unfitted non-linear
@@ -230,7 +234,7 @@ linear model.
 
 ### Plotting
 
-`ruleofthumb.plot` renders every modality. Colour convention throughout:
+`rot.plot` renders every modality. Colour convention throughout:
 **red = evidence toward the explained class, blue = against**.
 
 ```python
@@ -242,7 +246,7 @@ plot.bar(exp, x[:50], feature_names=names)        # also: beeswarm (batch-level)
 fig.savefig("waterfall.png")                      # everything returns a Figure
 
 # Text — token highlighting for Jupyter plus a static matplotlib export:
-out = ruleofthumb.embed_texts(["a wonderful film", "terrible pacing"])
+out = rot.embed_texts(["a wonderful film", "terrible pacing"])
 imp = exp.get_explanation(out.embeddings, attention_mask=out.attention_mask)
 plot.text_html(imp[0], out.tokens[0])             # IPython-aware HTML
 plot.text_matplotlib(imp[0], out.tokens[0]).savefig("tokens.png")
@@ -281,7 +285,7 @@ on the model's device, while the wrappers' `get_explanation` always returns
 host-side numpy arrays.
 
 ```python
-exp = ruleofthumb.fit(y_outputs=labels, x_inputs=X, device="cuda")  # or "mps", "cpu", ...
+exp = rot.fit(y_outputs=labels, x_inputs=X, device="cuda")  # or "mps", "cpu", ...
 ```
 
 ## Migrating from v0.1 sentinel padding
@@ -324,9 +328,9 @@ rot = RuleOfThumb(y_outputs=y, x_inputs=X)
 rot = TextRuleOfThumb(y_outputs=y, x_inputs=x, lengths=lengths)
 
 # v0.2.10+
-import ruleofthumb
-exp = ruleofthumb.fit(y_outputs=y, x_inputs=X)                    # modality auto-detected
-exp = ruleofthumb.fit_text(y_outputs=y, x_inputs=x, lengths=lengths)
+import ruleofthumb as rot
+exp = rot.fit(y_outputs=y, x_inputs=X)                    # modality auto-detected
+exp = rot.fit_text(y_outputs=y, x_inputs=x, lengths=lengths)
 ```
 
 The fitted explainer exposes the same `get_explanation` semantics, plus
@@ -402,7 +406,8 @@ behaviour.
 ## Status
 
 v0.0.1 is the first public pre-alpha: a vibe-coded consolidation of the
-original experiment code, published to reserve the PyPI name and invite
+original experiment code, published to reserve the PyPI name
+(`ruleofthumb-rot`) and invite
 early feedback. Expect breakage and backwards-incompatible changes before
 any 1.0. Internally this continues the 0.2.x line (explicit masks,
 unit-granularity reveal curves, explainer facade, native string/path

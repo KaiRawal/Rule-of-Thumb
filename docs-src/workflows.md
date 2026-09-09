@@ -26,13 +26,13 @@ inputs most-important-first and scores prediction fidelity along the curve:
 
 ## Automatic hyperparameter tuning
 
-`ruleofthumb.autotune` searches `learning_rate` / `batch_size` / `epochs`
+`rot.autotune` searches `learning_rate` / `batch_size` / `epochs`
 / `dropout_rate` / `weight_decay` with a seeded validation split, scores
 candidates by held-out reveal fidelity, and returns the winner refit on
 all data:
 
 ```python
-result = ruleofthumb.autotune(y_outputs=labels, x_inputs=x, search="random",
+result = rot.autotune(y_outputs=labels, x_inputs=x, search="random",
                               n_candidates=8, seed=0)
 result.explainer    # best config refit on all data — use like any explainer
 result.best_params  # winning hyperparameters
@@ -51,7 +51,7 @@ classes):
 
 ```python
 exp.save("explainer.rotx")
-loaded = ruleofthumb.load_explainer("explainer.rotx", device="cpu")
+loaded = rot.load_explainer("explainer.rotx", device="cpu")
 np.allclose(exp.get_explanation(x), loaded.get_explanation(x))  # identical
 ```
 
@@ -65,9 +65,9 @@ By default every surrogate is linear. Pass `nonlinear=` to any factory
 response `s` inside `imp[k,i] = a[k,i]·(s(x[i]) + b[k,i])`:
 
 ```python
-exp = ruleofthumb.fit_tabular(y, x, nonlinear="rbf")            # Gaussian bumps
-exp = ruleofthumb.fit_text(y, texts, nonlinear="hinge")         # SELU hinges
-exp = ruleofthumb.fit_image(y, paths, nonlinear={"type": "rbf", "n_bases": 32})
+exp = rot.fit_tabular(y, x, nonlinear="rbf")            # Gaussian bumps
+exp = rot.fit_text(y, texts, nonlinear="hinge")         # SELU hinges
+exp = rot.fit_image(y, paths, nonlinear={"type": "rbf", "n_bases": 32})
 ```
 
 Both responses are residual and zero-initialised, so an unfitted
@@ -80,7 +80,7 @@ the plain linear model.
 
 ## Plotting
 
-`ruleofthumb.plot` renders every modality (**red = evidence toward the
+`rot.plot` renders every modality (**red = evidence toward the
 explained class, blue = against**); everything returns a Figure, nothing
 auto-shows:
 
@@ -117,5 +117,5 @@ automatically; raw-model methods return tensors on the model's device,
 while `get_explanation` always returns host-side numpy arrays:
 
 ```python
-exp = ruleofthumb.fit(y_outputs=labels, x_inputs=X, device="cuda")  # or "mps", "cpu", ...
+exp = rot.fit(y_outputs=labels, x_inputs=X, device="cuda")  # or "mps", "cpu", ...
 ```

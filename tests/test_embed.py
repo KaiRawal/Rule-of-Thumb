@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`ruleofthumb.embed` using stubbed tokeniser/model.
+"""Unit tests for :mod:`rot.embed` using stubbed tokeniser/model.
 
 The stubs mimic the HuggingFace API surface that ``embed_texts`` relies on
 (tokeniser call returning ``input_ids`` / ``attention_mask`` tensors,

@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`ruleofthumb.plot` (Agg backend, no display)."""
+"""Unit tests for :mod:`rot.plot` (Agg backend, no display)."""
 
 import matplotlib
 import numpy as np

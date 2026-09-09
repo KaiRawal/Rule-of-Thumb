@@ -9,7 +9,7 @@ per-sample lengths — no fill value has special meaning (see
 
 ```python
 import numpy as np
-import ruleofthumb
+import ruleofthumb as rot
 from ruleofthumb.text import pad_sequences
 
 # Ragged inputs? Pad them — any fill value works, the mask carries the truth:
@@ -17,7 +17,7 @@ sequences = [np.random.rand(t, 384).astype(np.float32) for t in (20, 14, 17, 9)]
 x, lengths = pad_sequences(sequences)                # x: (4, 20, 384)
 labels = np.array([1, 0, 1, 0], dtype=np.int64)      # e.g. LLM predictions per text
 
-exp = ruleofthumb.fit_text(y_outputs=labels, x_inputs=x.numpy(), lengths=lengths)
+exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), lengths=lengths)
 token_importances = exp.get_explanation(x.numpy(), lengths=lengths)
 # signed, shape [N, max_tokens]; padded tokens score exactly 0
 # (for n_classes > 2 the output is per-class instead: [N, n_classes, max_tokens])
@@ -35,25 +35,25 @@ derives padding automatically, and every explainer method accepts the same
 strings back:
 
 ```python
-import ruleofthumb
+import ruleofthumb as rot
 
-exp = ruleofthumb.fit_text(y_outputs=labels, x_inputs=["a wonderful film", "terrible pacing"])
+exp = rot.fit_text(y_outputs=labels, x_inputs=["a wonderful film", "terrible pacing"])
 token_importances = exp.get_explanation(["a wonderful film", "terrible pacing"])
 order = exp.get_order(["a wonderful film", "terrible pacing"])
 ```
 
 Need the intermediate arrays (e.g. decoded tokens for plotting)? Use
-`ruleofthumb.embed_texts` directly:
+`rot.embed_texts` directly:
 
 ```python
-out = ruleofthumb.embed_texts(["a wonderful film", "terrible pacing"])
-exp = ruleofthumb.fit_text(y_outputs=labels, x_inputs=out.embeddings,
+out = rot.embed_texts(["a wonderful film", "terrible pacing"])
+exp = rot.fit_text(y_outputs=labels, x_inputs=out.embeddings,
                            attention_mask=out.attention_mask)
 out.tokens  # decoded token strings, aligned with per-token importances
 ```
 
 Migrating a legacy `-1`-padded array? Rebuild its mask in one line with
-`ruleofthumb.text.sentinel_mask`.
+`rot.text.sentinel_mask`.
 
 ## Reveal pipeline
 

@@ -1,4 +1,4 @@
-# Publishing `ruleofthumb` v0.0.1 to PyPI (+ docs on ReadTheDocs)
+# Publishing `ruleofthumb-rot` v0.0.1 to PyPI (+ docs on ReadTheDocs)
 
 > ⚠️ Experimental 0.0.x pre-alpha — entirely vibe-coded from hand-written
 > research code. May break; backwards-incompatible changes expected.
@@ -24,9 +24,9 @@ run. Do not commit from automation; review `git status` first.
 .venv/bin/python -m pytest
 .venv/bin/python -m ruff check .
 uv build
-tar tzf dist/ruleofthumb-0.0.1.tar.gz | head -n 20  # LICENSE + README present
-pip install dist/ruleofthumb-0.0.1-py3-none-any.whl --force-reinstall
-python -c "import ruleofthumb; print(ruleofthumb.__version__)"
+tar tzf dist/ruleofthumb_rot-0.0.1.tar.gz | head -n 20  # LICENSE + README present
+pip install dist/ruleofthumb_rot-0.0.1-py3-none-any.whl --force-reinstall
+python -c "import ruleofthumb as rot; print(rot.__version__)"
 ```
 
 Expected: pytest green, ruff clean, `dist/` holds exactly one sdist +
@@ -46,8 +46,8 @@ is committed):
 
 ```bash
 uv publish --publish-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ruleofthumb==0.0.1
-python -c "import ruleofthumb; print(ruleofthumb.__version__)"
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ruleofthumb-rot==0.0.1
+python -c "import ruleofthumb as rot; print(rot.__version__)"
 ```
 
 Check the TestPyPI project page renders: title, README (with the
@@ -60,7 +60,7 @@ Documentation links.
 uv publish --token "$PYPI_TOKEN"
 ```
 
-Then confirm on `https://pypi.org/p/ruleofthumb/`:
+Then confirm on `https://pypi.org/p/ruleofthumb-rot/`:
 
 - Version `0.0.1`, licence MIT, Python `>=3.9`.
 - README banner visible; `project.urls` all resolve.
@@ -92,7 +92,7 @@ One-time setup (in the RTD dashboard):
    3.10, `requirements.txt`, `pip install .`, Sphinx at
    `docs-src/conf.py`).
 3. First build runs automatically; confirm the site renders at
-   `https://ruleofthumb.readthedocs.io/` — Home, Guides, executed
+   `https://rot.readthedocs.io/` — Home, Guides, executed
    Notebooks, Migration, Capacity, API, Test report.
 4. Under `Admin → Versions`, activate the `v0.0.1` tag build so
    `stable` tracks the release; `latest` tracks `main`.
@@ -163,7 +163,7 @@ instead of pytest; then confirm the RTD `latest` build for the push.
 |---|---|
 | `uv build` errors on backend | Check `[build-system]` = `uv_build>=0.12.10,<0.13` / `uv_build`; run with `RUST_LOG=uv=debug uv build`. |
 | Sdist missing `LICENSE`/`README` | Check `license-files = ["LICENSE*"]` and `readme = "README.md"`; `LICENSE` must sit next to `pyproject.toml`. |
-| `uv publish` 403 | Token scope (project vs account), or name taken — confirm `pypi.org/p/ruleofthumb/`. |
+| `uv publish` 403 | Token scope (project vs account), or name taken — confirm `pypi.org/p/ruleofthumb-rot/` (mint a token scoped to the new name if the old one was project-scoped). |
 | `sphinx-build -W` warnings as errors | Fix the flagged link/docstring, don't drop `-W`. |
 | Stale notebook outputs in the site | Clear the execution cache (`rm -rf .jupyter_cache`) and rebuild; changed notebooks re-run automatically. |
 | RTD build fails | Check `.readthedocs.yaml` (Python version, requirements path); reproduce locally with the §1 command; RTD needs `requirements.txt` to install cleanly on Ubuntu. |

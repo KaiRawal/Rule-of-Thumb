@@ -1,4 +1,4 @@
-"""Unit tests for :func:`ruleofthumb.autotune`.
+"""Unit tests for :func:`rot.autotune`.
 
 Beyond search mechanics (grid enumeration, candidate counts, seeding), the
 fit-quality tests assert that the search genuinely finds good fits: on a

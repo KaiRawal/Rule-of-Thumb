@@ -2,8 +2,12 @@
 requires = ["uv_build>=0.12.10,<0.13"]
 build-backend = "uv_build"
 
+# Distribution name (ruleofthumb-rot) differs from the import package.
+[tool.uv.build-backend]
+module-name = "ruleofthumb"
+
 [project]
-name = "ruleofthumb"
+name = "ruleofthumb-rot"
 version = "0.0.1"
 description = "Rule of Thumb: explaining AI systems using partial information (experimental 0.0.x)"
 readme = "README.md"

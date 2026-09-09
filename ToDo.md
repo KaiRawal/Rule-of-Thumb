@@ -61,7 +61,7 @@ are provenance notes only; the legacy code did not move with the package.
 ## Changelog
 
 - **v0.0.1** — first public pre-alpha (version reset from internal v0.2.19
-  to reserve the PyPI name and invite early feedback). Entirely vibe-coded
+  to reserve the PyPI name (`ruleofthumb-rot`) and invite early feedback). Entirely vibe-coded
   from hand-written research code; expect breakage and
   backwards-incompatible changes before any 1.0. Build backend switched
   from hatchling to `uv_build`; package metadata completed (`LICENSE`

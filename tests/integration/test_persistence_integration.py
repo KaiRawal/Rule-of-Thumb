@@ -1,7 +1,7 @@
 """Integration tests: fitted explainers survive save/load on real artifacts.
 
 Each case fits on committed artifacts, saves to a temporary file, reloads
-with :func:`ruleofthumb.load_explainer` and asserts identical explanations
+with :func:`rot.load_explainer` and asserts identical explanations
 and reveal-curve outputs. The subprocess case proves survival across a real
 process boundary.
 """

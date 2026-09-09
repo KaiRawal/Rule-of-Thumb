@@ -1,7 +1,7 @@
 """Integration tests: the legacy GPT cat-vs-dog experiment, miniaturized.
 
 Mirrors ``ExplanationExampleRemote/run.py``: MobileNetV3-Small feature maps of
-cat/dog JPEGs are explained through a binary :func:`ruleofthumb.fit_image`
+cat/dog JPEGs are explained through a binary :func:`rot.fit_image`
 surrogate fitted on **GPT-4o-mini labels** (the black box being explained is
 the vision-language model's behaviour, not the ground truth).
 

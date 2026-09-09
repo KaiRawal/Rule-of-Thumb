@@ -317,7 +317,7 @@ Pins for save/load: round-trip identical outputs (tabular/text/image);
 
 ### `tests/test_plot.py` (12)
 
-Pins for `ruleofthumb.plot`: single-row figures (waterfall/force/decision);
+Pins for `rot.plot`: single-row figures (waterfall/force/decision);
 batch figures (bar/beeswarm); values/base use class bias; HTML sign colours;
 max-tokens truncation; matplotlib text figure; saliency with/without image;
 nonpositive power rejected; word clouds figure.

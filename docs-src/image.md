@@ -9,14 +9,14 @@ implies). Mixed-size batches are supported two ways.
 ```python
 import numpy as np
 import torch
-import ruleofthumb
+import ruleofthumb as rot
 from ruleofthumb.image import pad_images
 
 images = [np.random.rand(3, h, w).astype(np.float32) for h, w in [(32, 32), (28, 40)]]
 labels = torch.randint(0, 2, (2,))
 
 x, mask = pad_images(images)                          # x: (2, 3, 32, 40); mask: (2, 32, 40)
-exp = ruleofthumb.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
+exp = rot.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
 imp = exp.get_explanation(x.numpy(), mask=mask.numpy())  # signed, shape [N, H, W]
 ```
 
@@ -41,17 +41,17 @@ derives validity masks automatically, and every explainer method accepts
 the same paths back:
 
 ```python
-import ruleofthumb
+import ruleofthumb as rot
 
 paths = ["cat.jpg", "dog.jpg"]
-exp = ruleofthumb.fit_image(y_outputs=labels, x_inputs=paths)               # native sizes, padded
-exp = ruleofthumb.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))  # resize + centre-crop
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths)               # native sizes, padded
+exp = rot.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))  # resize + centre-crop
 imp = exp.get_explanation(paths)   # signed, shape [N, H, W]
 ```
 
 Need custom preprocessing (e.g. ImageNet normalisation for a torchvision
 black box)? Supply `transform=` (a PIL Image → tensor callable), or use
-`ruleofthumb.load_images(paths, ...)` directly to inspect `.images` /
+`rot.load_images(paths, ...)` directly to inspect `.images` /
 `.mask`.
 
 ## Reveal pipeline

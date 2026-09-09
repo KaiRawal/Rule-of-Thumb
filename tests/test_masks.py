@@ -230,14 +230,14 @@ def test_tabular_both_granularities_identical():
 
 
 def test_legacy_imports_are_gone():
-    import ruleofthumb
+    import ruleofthumb as rot
 
-    assert not hasattr(ruleofthumb, "RoT_text")
-    assert not hasattr(ruleofthumb, "RoT_image")
+    assert not hasattr(rot, "RoT_text")
+    assert not hasattr(rot, "RoT_image")
 
 
 @pytest.mark.parametrize("util", ["pad_sequences", "sentinel_mask", "pad_images"])
 def test_padding_utils_exported(util):
-    import ruleofthumb
+    import ruleofthumb as rot
 
-    assert hasattr(ruleofthumb, util)
+    assert hasattr(rot, util)

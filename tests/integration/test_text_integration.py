@@ -3,7 +3,7 @@
 The black box is the cached ``distilbert-base-uncased-finetuned-sst-2-english``
 model; its token embeddings and predicted labels are computed live at session
 start. Only the RoT explainer is fitted, through the
-:func:`ruleofthumb.fit_text` facade.
+:func:`rot.fit_text` facade.
 """
 
 import re

@@ -7,7 +7,7 @@ Black boxes are TinyCNNs (architecture in ``cnn.py``) trained once by
 - binary dense-vs-sparse classifier whose labels split at the median ink mass.
 
 Only the RoT explainer is fitted live, through the
-:func:`ruleofthumb.fit_image` facade. Note the image RoT shares importance
+:func:`rot.fit_image` facade. Note the image RoT shares importance
 across spatial locations, so a sample's score is monotone in total ink mass
 on raw single-channel inputs: the dense-vs-sparse task is exactly the kind
 of signal it can express, while the raw 10-class task mostly exercises

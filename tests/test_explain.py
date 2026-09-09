@@ -31,31 +31,31 @@ def image_data():
 
 
 def test_fit_auto_detects_modality(tabular_data, text_data, image_data):
-    import ruleofthumb
+    import ruleofthumb as rot
 
     x_tab, y_tab = tabular_data
     tx, lengths, ty = text_data
     ix, _imask, iy = image_data
 
-    exp = ruleofthumb.fit(y_tab, x_tab)
+    exp = rot.fit(y_tab, x_tab)
     assert exp.modality == "tabular"
-    exp = ruleofthumb.fit(ty, tx, lengths=lengths)
+    exp = rot.fit(ty, tx, lengths=lengths)
     assert exp.modality == "text"
     ix, imask, iy = image_data
-    exp = ruleofthumb.fit(iy, ix, mask=imask.numpy())
+    exp = rot.fit(iy, ix, mask=imask.numpy())
     assert exp.modality == "image"
 
 
 def test_fit_explicit_modality_override(tabular_data):
-    import ruleofthumb
+    import ruleofthumb as rot
 
     x, y = tabular_data
-    exp = ruleofthumb.fit(y, x, modality="tabular")
+    exp = rot.fit(y, x, modality="tabular")
     assert exp.modality == "tabular"
     with pytest.raises(ValueError, match="unknown modality"):
-        ruleofthumb.fit(y, x, modality="video")
+        rot.fit(y, x, modality="video")
     with pytest.raises(ValueError, match="ndim"):
-        ruleofthumb.fit(y, x.reshape(-1), modality="auto")
+        rot.fit(y, x.reshape(-1), modality="auto")
 
 
 def test_explainer_explanation_shape(tabular_data):
@@ -240,10 +240,10 @@ def test_explainer_device_parameter(tabular_data, text_data):
 
 
 def test_explainer_delegates_reveal_pipeline(tabular_data):
-    import ruleofthumb
+    import ruleofthumb as rot
 
     x, y = tabular_data
-    exp = ruleofthumb.fit(y, x, epochs=4, batch_size=32, learning_rate=0.05)
+    exp = rot.fit(y, x, epochs=4, batch_size=32, learning_rate=0.05)
     order = exp.get_order(torch.from_numpy(x))
     assert order.shape == (64, 5)
 
@@ -260,10 +260,10 @@ def test_explainer_delegates_reveal_pipeline(tabular_data):
 
 
 def test_package_exports():
-    import ruleofthumb
+    import ruleofthumb as rot
 
-    assert ruleofthumb.__version__ == "0.0.1"
+    assert rot.__version__ == "0.0.1"
     for name in ("Explainer", "fit", "fit_tabular", "fit_text", "fit_image", "RoT"):
-        assert hasattr(ruleofthumb, name)
+        assert hasattr(rot, name)
     for removed in ("RuleOfThumb", "TextRuleOfThumb"):
-        assert not hasattr(ruleofthumb, removed)
+        assert not hasattr(rot, removed)
