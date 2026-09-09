@@ -218,6 +218,11 @@ and image paths. `n_classes` is inferred from the labels; any other factory
 keyword (`nonlinear`, `l1_penalty`, `mask`, ...) is forwarded to both the
 candidate fits and the final refit.
 
+The factory defaults (`epochs=500, batch_size=5000`) suit tiny inputs.
+Scale them to the data: small tabular batches fit anywhere, while 96px
+images want `batch_size=16–64` with modest epochs. A `batch_size` larger
+than N warns (training runs full-batch).
+
 ### Saving and loading
 
 Fitted explainers round-trip through `Explainer.save` / `load_explainer`
@@ -276,6 +281,12 @@ plot.word_clouds(imp, out.tokens)                 # aggregated pos/neg/combined 
 # Images — legacy-style saliency overlay (red/blue transparent heatmaps):
 plot.saliency(imp_map, image=rgb_array).savefig("saliency.png")
 ```
+
+Saliency overlays always render at full strength, even when the surrogate
+barely tracks the black box — do not read them as detectors (of lesions,
+objects, or anything focal). Every fit records `exp.train_agreement_` and
+warns below 0.75; check it, and the [Capacity](https://rule-of-thumb.readthedocs.io/en/latest/capacity.html)
+guidance, before trusting a map.
 
 **Baseline semantics (SHAP → RoT).** SHAP decomposes `f(x) = φ₀ + Σφᵢ`
 with `φ₀ = E[f(X)]`. RoT's surrogate is additive by construction:

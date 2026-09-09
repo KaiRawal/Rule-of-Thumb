@@ -34,13 +34,13 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 10 files | 135 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 10 files | 139 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 9 files | 58 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
 
-Per-file counts: test_core 18, test_embed 14, test_explain 19, test_image 16,
+Per-file counts: test_core 18, test_embed 14, test_explain 23, test_image 16,
 test_masks 14, test_nonlinear 15, test_persistence 6, test_plot 12,
 test_text 12, test_tune 9, gpt_pet 5, image 12, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 193.
+plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 197.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -280,12 +280,13 @@ device arg; empty/bad-input rejections; `DEFAULT_TEXT_MODEL`; string routing
 through facade; strings+explicit-padding rejection; array-fitted string-query
 error.
 
-### `tests/test_explain.py` (19)
+### `tests/test_explain.py` (23)
 
 Pins for `Explainer` facade: modality auto-detect/override; explanation
 shapes (tabular/text/image, binary + multiclass); signed outputs; mask-only
 text contract; padding-arg/kwarg rejection; out-of-range/empty label
-rejection; host-side inference on MPS (skipped without MPS);
+rejection; host-side inference on MPS (skipped without MPS); readonly-array
+silence; oversized-batch warning; fit-quality warn/quiet tripwire;
 hyperparameter threading; seeding;
 device; reveal delegation; `__version__ == "0.2.19"`; removed
 `RuleOfThumb`/`TextRuleOfThumb` absent.

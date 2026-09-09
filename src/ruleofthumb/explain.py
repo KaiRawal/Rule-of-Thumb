@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import functools
 import os
+import warnings
 from typing import Any
 
 import numpy as np
@@ -39,7 +40,43 @@ def _is_path_batch(x):
 
 
 def _as_float_inputs(x_inputs):
-    return torch.from_numpy(np.asarray(x_inputs)).to(torch.float)
+    return torch.from_numpy(_writable_array(x_inputs)).to(torch.float)
+
+
+def _writable_array(x):
+    """Copy read-only (e.g. mmap) arrays so ``torch.from_numpy`` stays silent."""
+    arr = np.asarray(x)
+    return arr if arr.flags.writeable else arr.copy()
+
+
+def _warn_if_oversized_batch(batch_size, n):
+    """Warn when the requested batch exceeds ``N``; training then runs full-batch."""
+    if batch_size > n:
+        warnings.warn(
+            f"batch_size={batch_size} exceeds the {n} samples; training runs full-batch. "
+            f"Pass batch_size<={n} for minibatching, or a size suited to the input "
+            "(e.g. 16-64 for 96px images)."
+        )
+
+
+_FIT_QUALITY_THRESHOLD = 0.75
+
+
+def _attach_fit_quality(explainer, points, labels, mask=None):
+    """Record train agreement; warn when explanations may be gibberish.
+
+    Train (in-sample, optimistic) agreement between the fitted surrogate
+    and the black-box labels — a tripwire, not a verdict. Stored as
+    ``explainer.train_agreement_`` (transient; not persisted by ``save``).
+    """
+    agreement = float((np.asarray(explainer.predict(points, mask=mask).cpu()) == np.asarray(labels)).mean())
+    explainer.train_agreement_ = agreement
+    if agreement < _FIT_QUALITY_THRESHOLD:
+        warnings.warn(
+            f"low train agreement ({agreement:.3f} < {_FIT_QUALITY_THRESHOLD}); explanations may be unreliable. "
+            "Check surrogate-vs-blackbox agreement before trusting them (see the capacity docs)."
+        )
+    return explainer
 
 
 def _as_labels(y_outputs):
@@ -75,6 +112,10 @@ class Explainer:
     subclass) for full manual control; the reveal-pipeline methods
     (:meth:`get_order`, :meth:`ordered_predict`, :meth:`score_ordering`, ...)
     delegate to it verbatim.
+
+    Freshly fitted explainers carry ``train_agreement_`` (surrogate-vs-label
+    agreement on the train inputs, ``None`` on reloaded ones); a low value
+    also emits a warning at fit time.
     """
 
     def __init__(self, model, modality, string_embedder=None, image_loader=None):
@@ -82,6 +123,7 @@ class Explainer:
         self._modality = modality
         self._string_embedder = string_embedder
         self._image_loader = image_loader
+        self.train_agreement_ = None
 
     @property
     def modality(self):
@@ -138,7 +180,7 @@ class Explainer:
                 raise ValueError("raw inputs derive their padding automatically; pass no mask")
             x, native_mask = resolved
         else:
-            x = torch.from_numpy(np.asarray(x_numpy)).to(self._model.device)
+            x = torch.from_numpy(_writable_array(x_numpy)).to(self._model.device)
             native_mask = None
         if self._modality == "tabular":
             if mask is not None:
@@ -321,6 +363,7 @@ def fit_tabular(
     """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs."""
     labels = _check_label_range(_as_labels(y_outputs), n_classes)
     model = RoT(n_classes, (x_inputs.shape[1],), dropout_rate=dropout_rate, device=device, nonlinear=nonlinear)
+    _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
     model.fit(
         _as_float_inputs(x_inputs),
         labels,
@@ -331,7 +374,7 @@ def fit_tabular(
         weight_decay=weight_decay,
         seed=seed,
     )
-    return Explainer(model, "tabular")
+    return _attach_fit_quality(Explainer(model, "tabular"), _as_float_inputs(x_inputs), labels)
 
 
 def fit_text(
@@ -380,6 +423,7 @@ def fit_text(
         mask = torch.from_numpy(embedded.attention_mask)
     elif mask is not None:
         mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
+    _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
     rot = RoTText(
         n_classes,
         (x_inputs.shape[1], x_inputs.shape[2]),
@@ -399,7 +443,10 @@ def fit_text(
         weight_decay=weight_decay,
         seed=seed,
     )
-    return Explainer(rot, "text", string_embedder=string_embedder)
+    labels = _as_labels(y_outputs)
+    return _attach_fit_quality(
+        Explainer(rot, "text", string_embedder=string_embedder), _as_float_inputs(x_inputs), labels, mask=mask
+    )
 
 
 def fit_image(
@@ -447,6 +494,7 @@ def fit_image(
         mask = torch.from_numpy(loaded.mask)
     elif mask is not None:
         mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
+    _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
     rot = RoTImage(n_classes, (x_inputs.shape[1],), dropout_rate=dropout_rate, device=device, nonlinear=nonlinear)
     rot.fit(
         _as_float_inputs(x_inputs),
@@ -459,4 +507,7 @@ def fit_image(
         weight_decay=weight_decay,
         seed=seed,
     )
-    return Explainer(rot, "image", image_loader=image_loader)
+    labels = _as_labels(y_outputs)
+    return _attach_fit_quality(
+        Explainer(rot, "image", image_loader=image_loader), _as_float_inputs(x_inputs), labels, mask=mask
+    )

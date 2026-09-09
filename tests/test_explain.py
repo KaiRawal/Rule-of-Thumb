@@ -317,3 +317,58 @@ def test_factories_reject_out_of_range_labels():
         fit_tabular(np.array([0, -1]), rng.rand(2, 3).astype(np.float32), epochs=1, batch_size=2)
     with pytest.raises(ValueError, match="non-empty"):
         fit_tabular(np.array([], dtype=np.int64), rng.rand(0, 3).astype(np.float32), epochs=1, batch_size=6)
+
+
+def test_readonly_arrays_convert_silently(tmp_path):
+    """Bug 6 extension: mmap/read-only inputs must not warn (copy before convert)."""
+    import warnings
+
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(0)
+    x = rng.rand(32, 4).astype(np.float32)
+    y = (x[:, 0] > 0).astype(np.int64)
+    path = tmp_path / "x.npy"
+    np.save(path, x)
+    xr = np.load(path, mmap_mode="r")
+    assert not xr.flags.writeable
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        exp = fit_tabular(y, xr, epochs=2, batch_size=32, learning_rate=0.05, seed=0)
+        imp = exp.get_explanation(xr)
+    assert imp.shape == (32, 4)
+
+
+def test_oversized_batch_warns(tabular_data):
+    """Bug 9: an oversized batch warns loudly instead of silently running full-batch."""
+    from ruleofthumb import fit_tabular
+
+    x, y = tabular_data
+    with pytest.warns(UserWarning, match="batch_size"):
+        exp = fit_tabular(y, x, epochs=2, batch_size=5000, learning_rate=0.05, seed=0)
+    assert len(exp.model.training_loss) == 2
+
+
+def test_fit_quality_warns_on_random_labels():
+    """Bug 10: near-chance train agreement warns and is inspectable."""
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(0)
+    x = rng.rand(128, 4).astype(np.float32)
+    y = rng.randint(0, 2, 128).astype(np.int64)
+    with pytest.warns(UserWarning, match="train agreement"):
+        exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, seed=0)
+    assert exp.train_agreement_ < 0.75
+
+
+def test_fit_quality_quiet_on_clean_task(tabular_data):
+    """Bug 10: a clean fit records high agreement with no warning."""
+    import warnings
+
+    from ruleofthumb import fit_tabular
+
+    x, y = tabular_data
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
+    assert exp.train_agreement_ >= 0.75

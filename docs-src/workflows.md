@@ -58,6 +58,19 @@ result = rot.autotune(y_outputs=labels, x_inputs=x, search="grid",
                               nonlinear="hinge", mask=mask, seed=0)
 ```
 
+The factory defaults (`epochs=500, batch_size=5000`) suit tiny inputs —
+scale them to the data (96px images: `batch_size=16–64` with modest
+epochs). A `batch_size` larger than N warns (training runs full-batch).
+
+## Fit quality signal
+
+Every fit records `exp.train_agreement_` — surrogate-vs-blackbox agreement
+on the train inputs — and warns below 0.75, where explanations may be
+gibberish. It is train (in-sample, optimistic), not held-out: a tripwire,
+not a verdict. Reloaded explainers report `None` (the estimate is
+transient and not saved); `autotune`'s `best_score` remains the richer
+signal where tuning runs.
+
 ## Saving and loading
 
 Fitted explainers round-trip through `Explainer.save` /
