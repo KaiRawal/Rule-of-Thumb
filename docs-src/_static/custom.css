@@ -1,0 +1,8 @@
+.rot-hero {
+  border-left: 4px solid var(--pst-color-primary);
+  padding-left: 1rem;
+}
+
+.bd-sidebar .toctree-caption {
+  margin-top: 1rem;
+}

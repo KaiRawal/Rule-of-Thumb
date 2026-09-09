@@ -102,19 +102,40 @@ MIT — see `LICENSE`. Note the experimental caveat above still applies.
 ```{toctree}
 :hidden:
 :maxdepth: 2
-:caption: Contents
+:caption: Get started
 
 quickstart
+notebooks/01_tabular_quickstart
+notebooks/02_text_quickstart
+notebooks/03_image_quickstart
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 2
+:caption: Guides
+
 tabular
 text
 image
 workflows
-notebooks/01_tabular_quickstart
-notebooks/02_text_quickstart
-notebooks/03_image_quickstart
-migration
 capacity
+migration
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 2
+:caption: Reference
+
 api
 test-report
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 2
+:caption: Development
+
 development
 ```
