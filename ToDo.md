@@ -43,6 +43,35 @@ are provenance notes only; the legacy code did not move with the package.
     raw inputs (`2·K·H·W` parameters), behind a constructor flag so the
     legacy behaviour stays the default.
 
+20. **Documentation content and presentation pass.** The reference docs are
+    complete but the site undersells the package: no conceptual overviews
+    (when RoT fits, how it differs from sensitivity-based explainers, how
+    to judge trust), examples are hello-worlds on dummy data only, plots
+    have no visual gallery, and the test-suite report isn't framed for
+    comparison. Content work, in order: (a) overview essays; (b) real-task
+    example gallery per modality built from the integration artifacts;
+    (c) per-plot-type visual gallery; (d) benchmarks framing; (e)
+    release-notes and contributing pages surfaced from the existing
+    runbooks. Presentation work within the current theme: logo/favicon,
+    landing hero image, announcement banner for the pre-alpha caveat,
+    gallery thumbnails, tighter nav grouping, small custom CSS. Non-goal:
+    no theme switch.
+
+21. **Publication-ready plots via `shap-editorial`.** `shap-editorial`
+    (MIT, v0.1.x alpha, single maintainer — exact pin, treat as
+    replaceable) renders beeswarm/waterfall/bar/scatter from duck-typed
+    `shap.Explanation` objects, returning `(fig, ax)`; it is now a base
+    dependency so it can be imported anywhere in the package. Our tabular
+    path already packs RoT values into `shap.Explanation`, so spike
+    compatibility first: if the objects are accepted as-is, expose
+    editorial variants (`plot.editorial_*` or a `style=` flag) starting
+    with tabular waterfall/bar/beeswarm. Explicit decisions required:
+    palette (editorial grey→red clashes with our binding red=toward /
+    blue=against — override to RoT convention or adopt editorial
+    deliberately, recorded in the changelog); multiclass (rejected
+    upstream — slice a class first, matching our per-class outputs). Ship
+    with tests, a gallery demo under item 20(c), and README/docs updates.
+
 ## Release / maintenance
 
 17. CI workflow: GitHub Actions running `pytest` + `ruff check .` on push/PR,

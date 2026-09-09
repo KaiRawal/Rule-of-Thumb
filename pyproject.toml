@@ -33,6 +33,7 @@ dependencies = [
     "wordcloud>=1.9",
     "Pillow>=9.0",
     "shap>=0.45",
+    "shap-editorial>=0.1.2",
 ]
 
 [project.urls]
