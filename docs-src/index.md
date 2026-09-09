@@ -76,6 +76,7 @@ Every public symbol, each rendered on the [API reference](api.md):
 | `embed_texts` | Transformer text embedder |
 | `TextEmbeddings` | Embedding result (embeddings, mask, tokens) |
 | `DEFAULT_TEXT_MODEL` | Bundled embedding model name |
+| `DEFAULT_TEXT_REVISION` | Pinned revision of the bundled model |
 | `load_images` | Image-file loader (raw pixels) |
 | `ImageBatch` | Loaded images + validity mask |
 | `embed_images` | Image-file embedder (backbone maps) |

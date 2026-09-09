@@ -19,7 +19,10 @@ SEED = 0
 
 
 def _fit_pets(features, y_gpt):
-    return fit_image(y_gpt, features, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED)
+    # The committed reference heatmaps are CPU artifacts: this fit always runs
+    # on CPU so the anchor comparison is exact on every machine, whatever
+    # ROT_TEST_DEVICE says.
+    return fit_image(y_gpt, features, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device="cpu")
 
 
 def test_feature_maps_shape(pet_features):

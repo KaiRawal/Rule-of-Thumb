@@ -6,7 +6,7 @@ fixed-hyperparameter integration tests use, and the returned full-data refit
 must reproduce that fidelity on all data.
 """
 
-from _helpers import rot_accuracy
+from _helpers import TEST_DEVICE, rot_accuracy
 
 from ruleofthumb import autotune
 
@@ -22,7 +22,7 @@ def test_tabular_autotune_reaches_high_fidelity(tabular_binary):
         "dropout_rate": [0.1, 0.5],
         "weight_decay": [0.0],
     }
-    result = autotune(y, x, modality="tabular", search="random", n_candidates=3, space=space, seed=SEED)
+    result = autotune(y, x, modality="tabular", search="random", n_candidates=3, space=space, seed=SEED, device=TEST_DEVICE)
 
     assert result.best_score >= 0.9  # held-out fidelity on breast cancer
     # the returned explainer is refit on all data and stays accurate
@@ -38,7 +38,7 @@ def test_text_autotune_reaches_sentiment_fidelity(text_sst2):
         "dropout_rate": [0.3, 0.5],
         "weight_decay": [0.0],
     }
-    result = autotune(y, x, modality="text", search="random", n_candidates=3, space=space, seed=SEED)
+    result = autotune(y, x, modality="text", search="random", n_candidates=3, space=space, seed=SEED, device=TEST_DEVICE)
 
     assert result.best_score >= 0.85  # matches the fixed-fit floor in test_text_integration
     assert rot_accuracy(result.explainer, x, y) >= 0.85
@@ -53,7 +53,7 @@ def test_image_autotune_reaches_binary_fidelity(image_multiclass):
         "dropout_rate": [0.3, 0.5],
         "weight_decay": [0.0],
     }
-    result = autotune(y, x, modality="image", search="random", n_candidates=3, space=space, seed=SEED)
+    result = autotune(y, x, modality="image", search="random", n_candidates=3, space=space, seed=SEED, device=TEST_DEVICE)
 
     assert result.best_score >= 0.9  # dense-vs-sparse is expressible by the surrogate
     assert rot_accuracy(result.explainer, x, y) >= 0.9

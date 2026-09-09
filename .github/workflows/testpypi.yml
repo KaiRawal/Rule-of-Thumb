@@ -16,9 +16,36 @@ jobs:
         with:
           python-version: "3.10"
       - uses: astral-sh/setup-uv@v5
+      - name: Stamp per-commit dev version
+        run: |
+          DEV_VER="0.0.1.dev${GITHUB_RUN_NUMBER}"
+          echo "Stamping TestPyPI version: $DEV_VER"
+          python - "$DEV_VER" <<'EOF'
+          import re
+          import sys
+
+          dev_ver = sys.argv[1]
+          assert re.fullmatch(r"0\.0\.1\.dev\d+", dev_ver), dev_ver
+
+          path = "pyproject.toml"
+          text = open(path).read()
+          new, n = re.subn(r'^version = ".*"$', f'version = "{dev_ver}"', text, count=1, flags=re.M)
+          assert n == 1, "pyproject version line not found"
+          open(path, "w").write(new)
+
+          path = "src/ruleofthumb/__init__.py"
+          text = open(path).read()
+          new, n = re.subn(r'^__version__ = ".*"$', f'__version__ = "{dev_ver}"', text, count=1, flags=re.M)
+          assert n == 1, "__version__ line not found"
+          open(path, "w").write(new)
+          print(f"stamped {dev_ver}")
+          EOF
       - name: Build
-        run: uv build
+        run: |
+          uv build
+          ls dist/
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true

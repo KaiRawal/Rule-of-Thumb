@@ -58,6 +58,10 @@ page]({ref}`landing page <symbol-index>`).
 ```
 
 ```{eval-rst}
+.. autodata:: ruleofthumb.DEFAULT_TEXT_REVISION
+```
+
+```{eval-rst}
 .. autofunction:: ruleofthumb.load_images
 ```
 

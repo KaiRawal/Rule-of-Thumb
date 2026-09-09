@@ -12,7 +12,7 @@ for wine), explanation shapes/additivity and reveal-curve endpoints.
 import numpy as np
 import pytest
 import torch
-from _helpers import rot_accuracy
+from _helpers import TEST_DEVICE, rot_accuracy
 
 from ruleofthumb import fit_tabular
 
@@ -27,7 +27,7 @@ ACCURACY_FLOORS = {
 
 def _fit(stem, x, y):
     n_classes = 3 if stem == "wine" else 2
-    return fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=0, n_classes=n_classes)
+    return fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=0, device=TEST_DEVICE, n_classes=n_classes)
 
 
 @pytest.mark.parametrize("stem", ["compas", "wine"])
@@ -111,10 +111,10 @@ def test_breast_cancer_fidelity_and_rank_agreement():
     ybb_tr = bb.predict(xtr).astype(np.int64)
     ybb_te = bb.predict(xte).astype(np.int64)
 
-    exp = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0)
+    exp = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, device=TEST_DEVICE)
     assert rot_accuracy(exp, xte, ybb_te) >= 0.85
 
-    shaped = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, nonlinear="rbf")
+    shaped = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, device=TEST_DEVICE, nonlinear="rbf")
     assert rot_accuracy(shaped, xte, ybb_te) >= 0.85
 
     rot_scores = np.abs(exp.get_explanation(xte)).mean(0)

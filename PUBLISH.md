@@ -46,8 +46,11 @@ is committed):
 
 ## 2. Dry run: TestPyPI (automatic on every `main` push)
 
-`testpypi.yml` builds and uploads on each merge — check the run, then the
-project page. Manual fallback (same commands CI runs):
+`testpypi.yml` stamps a per-commit dev version (`0.0.1.dev<RUN_NUMBER>`,
+patched into `pyproject.toml` + `__version__` in the CI workspace only —
+the repo stays at `0.0.1`) so every merge uploads a unique distribution;
+re-runs fall back to `skip-existing`. Check the run, then the project page.
+Manual fallback (same commands CI runs):
 
 ```bash
 uv build

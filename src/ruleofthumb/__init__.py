@@ -6,7 +6,7 @@ before trusting them.
 """
 
 from ruleofthumb.core import RoT
-from ruleofthumb.embed import DEFAULT_TEXT_MODEL, TextEmbeddings, embed_texts
+from ruleofthumb.embed import DEFAULT_TEXT_MODEL, DEFAULT_TEXT_REVISION, TextEmbeddings, embed_texts
 from ruleofthumb.explain import Explainer, fit, fit_image, fit_tabular, fit_text, load_explainer
 from ruleofthumb.image import ImageBatch, load_images, pad_images
 from ruleofthumb.text import lengths_to_mask, pad_sequences
@@ -18,6 +18,7 @@ __version__ = "0.0.1"
 __all__ = [
     "DEFAULT_IMAGE_MODEL",
     "DEFAULT_TEXT_MODEL",
+    "DEFAULT_TEXT_REVISION",
     "AutotuneResult",
     "Explainer",
     "ImageBatch",

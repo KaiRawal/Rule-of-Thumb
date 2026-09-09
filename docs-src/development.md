@@ -29,7 +29,18 @@ mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv
 Green on all three is the definition of done, enforced mechanically by
 CI on every push and pull request. The test suite never trains a model
 and never downloads a dataset — it loads committed artifacts plus
-locally cached weights only. Docs are written in MyST markdown under
+locally cached weights only (backbone revisions are pinned; see
+`tests/integration/conftest.py`). Integration fits run on CPU by default
+for exact cross-machine reproduction; GPU coverage is split out:
+
+- `tests/integration/test_device_parity.py` cross-checks each locally
+  available accelerator (MPS/CUDA) against CPU within tolerance — a plain
+  local `pytest` exercises MPS automatically on Apple Silicon, while
+  CPU-only CI runs the CPU leg and skips the rest.
+- To run the whole integration tier on an accelerator instead
+  (exploratory — the committed reference anchors assume CPU):
+  `ROT_TEST_DEVICE=mps pytest tests/integration -q -p no:cacheprovider`
+  (or `=cuda` where available). Docs are written in MyST markdown under
 `docs-src/`; cross-page anchors need explicit `(label)=` targets (plain
 `page.md#header` links fail `-W`).
 
@@ -38,7 +49,7 @@ locally cached weights only. Docs are written in MyST markdown under
 | Event | What runs | Effect |
 |---|---|---|
 | Push / pull request | `check.yml`: ruff + pytest + docs build | Red status blocks the merge; nothing deploys |
-| Push to `main` | `testpypi.yml`: build + upload | TestPyPI release; packaging breakage surfaces immediately |
+| Push to `main` | `testpypi.yml`: stamp `0.0.1.dev<RUN_NUMBER>`, build + upload | Per-commit TestPyPI release; packaging breakage surfaces immediately |
 | Push of tag `v*` | `release.yml`: build + upload to PyPI | Live release; the tag is the only trigger |
 | Push to `main` / new tag | ReadTheDocs | `latest` rebuilds on push; `stable` follows activated tags |
 

@@ -257,7 +257,7 @@ def make_pets(manifest):
 
     pd.DataFrame(rows).to_csv(Path(ARTIFACTS) / "pets_labels.csv", index=False)
 
-    weights = tv_models.MobileNet_V3_Small_Weights.DEFAULT
+    weights = tv_models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
     backbone = tv_models.mobilenet_v3_small(weights=weights).eval()
     transform = weights.transforms()
     batch = torch.stack([transform(Image.open(pet_dir / r["filename"]).convert("RGB")) for r in rows])
@@ -267,7 +267,9 @@ def make_pets(manifest):
     y_gpt = np.array([1 if r["gpt_label"] == "dog" else 0 for r in rows], dtype=np.int64)
     from ruleofthumb import fit_image
 
-    exp = fit_image(y_gpt, features, epochs=300, batch_size=5000, learning_rate=0.05, seed=0)
+    torch.manual_seed(0)
+    torch.set_num_threads(1)
+    exp = fit_image(y_gpt, features, epochs=300, batch_size=5000, learning_rate=0.05, seed=0, device="cpu")
     reference = exp.get_explanation(features).astype(np.float32)  # signed class-"dog" heatmaps
     rot_accuracy = float((exp.predict(torch.from_numpy(features)).cpu().numpy() == y_gpt).mean())
 
@@ -389,7 +391,14 @@ def main():
         "python": sys.version.split()[0],
         "numpy": np.__version__,
         "torch": torch.__version__,
+        "torchvision": __import__("torchvision").__version__,
+        "transformers": __import__("transformers").__version__,
         "sklearn": __import__("sklearn").__version__,
+        # pinned backbone revisions the integration tier resolves (see
+        # conftest TEST_DEVICE/_deterministic and ruleofthumb.embed/vision)
+        "mobilenet_weights": "MobileNet_V3_Small_Weights.IMAGENET1K_V1",
+        "modernbert_revision": __import__("ruleofthumb").DEFAULT_TEXT_REVISION,
+        "sst2_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
         "files": {},
     }
     make_tabular_binary(manifest)

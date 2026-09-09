@@ -42,10 +42,14 @@ class ImageEmbeddings:
 
 
 def _mobilenet_v3_small_features():
-    """Frozen MobileNetV3-Small feature trunk (downloads weights once, torchvision cache)."""
+    """Frozen MobileNetV3-Small feature trunk (downloads weights once, torchvision cache).
+
+    The ``IMAGENET1K_V1`` weights are pinned explicitly (never ``DEFAULT``)
+    so feature maps reproduce exactly on every machine.
+    """
     from torchvision.models import MobileNet_V3_Small_Weights, mobilenet_v3_small
 
-    weights = MobileNet_V3_Small_Weights.DEFAULT
+    weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1
     model = mobilenet_v3_small(weights=weights)
     features = model.features
     features.eval()

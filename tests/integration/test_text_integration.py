@@ -11,7 +11,7 @@ import re
 import numpy as np
 import pytest
 import torch
-from _helpers import rot_accuracy
+from _helpers import TEST_DEVICE, rot_accuracy
 
 from ruleofthumb import fit_text
 
@@ -43,7 +43,7 @@ def _iter_words(encoded, tokenizer, i):
 
 
 def _fit_text(embeddings, attention_mask, y):
-    return fit_text(y, embeddings, mask=attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    return fit_text(y, embeddings, mask=attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
 
 
 def test_black_box_predictions_are_confident(text_sst2):
@@ -161,7 +161,7 @@ def test_embed_texts_produces_fit_ready_arrays():
     from ruleofthumb import DEFAULT_TEXT_MODEL, embed_texts
 
     texts = ["a wonderful masterpiece", "terrible"]
-    out = embed_texts(texts, DEFAULT_TEXT_MODEL, batch_size=2)
+    out = embed_texts(texts, DEFAULT_TEXT_MODEL, batch_size=2, device=TEST_DEVICE)
 
     n, tokens, dim = out.embeddings.shape
     assert (n, dim) == (2, 768)
@@ -186,9 +186,9 @@ def test_native_string_ingestion_end_to_end(text_sst2):
     from ruleofthumb import DEFAULT_TEXT_MODEL, embed_texts
 
     texts, y = text_sst2["texts"], text_sst2["y"]
-    exp = fit_text(y, texts, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    exp = fit_text(y, texts, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
 
-    embedded = embed_texts(texts, DEFAULT_TEXT_MODEL)
+    embedded = embed_texts(texts, DEFAULT_TEXT_MODEL, device=TEST_DEVICE)
     imp = exp.get_explanation(texts)
 
     assert exp.modality == "text"
@@ -219,18 +219,20 @@ def test_native_string_ingestion_end_to_end(text_sst2):
 def test_native_path_equals_array_path(text_sst2):
     """Fitting from strings with an explicit override matches the array path exactly."""
     transformers = pytest.importorskip("transformers")
+    from conftest import SST2_REVISION
+
     from ruleofthumb import embed_texts
 
-    tokenizer = transformers.AutoTokenizer.from_pretrained(text_sst2["model_name"])
-    backbone = transformers.AutoModel.from_pretrained(text_sst2["model_name"])
+    tokenizer = transformers.AutoTokenizer.from_pretrained(text_sst2["model_name"], revision=SST2_REVISION)
+    backbone = transformers.AutoModel.from_pretrained(text_sst2["model_name"], revision=SST2_REVISION)
     backbone.eval()
 
     texts, y = text_sst2["texts"], text_sst2["y"]
-    emb = embed_texts(texts, tokenizer=tokenizer, model=backbone, max_length=48)
+    emb = embed_texts(texts, tokenizer=tokenizer, model=backbone, max_length=48, device=TEST_DEVICE)
 
-    native = fit_text(y, texts, tokenizer=tokenizer, model=backbone, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED)
+    native = fit_text(y, texts, tokenizer=tokenizer, model=backbone, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
     arrays = fit_text(
-        y, emb.embeddings, mask=emb.attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED
+        y, emb.embeddings, mask=emb.attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE
     )
 
     imp_native = native.get_explanation(texts)

@@ -2,11 +2,20 @@
 
 Every fixture loads committed artifacts from ``tests/integration/artifacts/``
 (regenerate with ``tests/integration/generate_artifacts.py``). Nothing is
-trained or downloaded at test time except the HuggingFace SST-2 weights,
-which load from the local HF cache when present.
+trained or downloaded at test time except HuggingFace/torchvision weights,
+which resolve pinned revisions (SST-2 ``SST2_REVISION``, ModernBERT
+``DEFAULT_TEXT_REVISION``, MobileNet ``IMAGENET1K_V1``) from the local cache
+when present.
+
+Exact reproduction everywhere: the session-autouse ``_deterministic`` fixture
+seeds all RNGs and single-threads torch, and every explainer fit runs on
+``TEST_DEVICE`` (``"cpu"`` unless ``ROT_TEST_DEVICE`` is set), so macOS/MPS
+and Linux/CPU runs compute the same numbers. GPU coverage lives in
+``test_device_parity.py`` (opt-in via ``ROT_TEST_DEVICE=mps|cuda``).
 """
 
 import os
+import random
 
 import numpy as np
 import pandas as pd
@@ -20,6 +29,23 @@ from cnn import TinyCNN
 ARTIFACTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts")
 
 SST2_NAME = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
+SST2_REVISION = "714eb0fa89d2f80546fda750413ed43d93601a13"
+
+#: Device every integration fit runs on; override locally with
+#: ``ROT_TEST_DEVICE=mps`` (or ``=cuda``) — see ``test_device_parity.py``.
+TEST_DEVICE = os.environ.get("ROT_TEST_DEVICE", "cpu")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _deterministic():
+    """Seed every RNG and single-thread torch for exact cross-machine repro."""
+    seed = int(os.environ.get("ROT_TEST_SEED", "0"))
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+    yield
 
 
 def _require(name):
@@ -89,7 +115,7 @@ def pet_features(pets):
     from torchvision import models as tv_models
 
     labels = pets["labels"]
-    weights = tv_models.MobileNet_V3_Small_Weights.DEFAULT
+    weights = tv_models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
     backbone = tv_models.mobilenet_v3_small(weights=weights).eval()
     transform = weights.transforms()
     batch = torch.stack(
@@ -120,7 +146,7 @@ def digit_features_multiclass():
     data = np.load(_require("digits_image.npz"))
     x = data["x_multi"].astype(np.float32)
     y = data["y_multi"].astype(np.int64)
-    weights = tv_models.MobileNet_V3_Small_Weights.DEFAULT
+    weights = tv_models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
     backbone = tv_models.mobilenet_v3_small(weights=weights).eval()
     transform = weights.transforms()
     batch = torch.stack(
@@ -179,8 +205,8 @@ def image_multiclass():
 def text_sst2():
     """Fixed film reviews encoded with the cached SST-2 transformer."""
     transformers = pytest.importorskip("transformers")
-    tokenizer = transformers.AutoTokenizer.from_pretrained(SST2_NAME)
-    model = transformers.AutoModelForSequenceClassification.from_pretrained(SST2_NAME)
+    tokenizer = transformers.AutoTokenizer.from_pretrained(SST2_NAME, revision=SST2_REVISION)
+    model = transformers.AutoModelForSequenceClassification.from_pretrained(SST2_NAME, revision=SST2_REVISION)
     model.eval()
 
     with open(_require("reviews.txt")) as f:

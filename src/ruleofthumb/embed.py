@@ -23,6 +23,10 @@ from ruleofthumb.core import _resolve_device
 
 DEFAULT_TEXT_MODEL = "answerdotai/ModernBERT-base"
 
+#: Pinned HuggingFace revision of :data:`DEFAULT_TEXT_MODEL`, so embeddings
+#: reproduce exactly on every machine (CI cold-downloads match warm caches).
+DEFAULT_TEXT_REVISION = "8949b909ec900327062f0ebf497f51aef5e6f0c8"
+
 
 @dataclasses.dataclass(frozen=True)
 class TextEmbeddings:
@@ -42,7 +46,7 @@ class TextEmbeddings:
     tokens: list
 
 
-def _resolve_tokenizer_model(tokenizer, model, model_name):
+def _resolve_tokenizer_model(tokenizer, model, model_name, revision):
     if (tokenizer is None) != (model is None):
         raise ValueError("pass both tokenizer= and model=, or neither")
     if tokenizer is not None:
@@ -50,8 +54,8 @@ def _resolve_tokenizer_model(tokenizer, model, model_name):
     from transformers import AutoModel, AutoTokenizer
 
     return (
-        AutoTokenizer.from_pretrained(model_name),
-        AutoModel.from_pretrained(model_name),
+        AutoTokenizer.from_pretrained(model_name, revision=revision),
+        AutoModel.from_pretrained(model_name, revision=revision),
     )
 
 
@@ -63,6 +67,7 @@ def embed_texts(
     texts: Sequence[str],
     model_name: str = DEFAULT_TEXT_MODEL,
     *,
+    revision: str | None = DEFAULT_TEXT_REVISION,
     tokenizer: Any | None = None,
     model: Any | None = None,
     max_length: int | None = None,
@@ -75,6 +80,9 @@ def embed_texts(
         texts: list of raw strings.
         model_name: HuggingFace model used when ``tokenizer``/``model`` are
             not supplied.
+        revision: pinned HuggingFace revision for ``model_name`` (defaults
+            to :data:`DEFAULT_TEXT_REVISION`); pass ``None`` for the hub
+            default. Ignored when ``tokenizer``/``model`` are supplied.
         tokenizer: optional pre-loaded tokeniser; supplying it (together with
             ``model``) makes ``model_name`` irrelevant.
         model: optional pre-loaded ``AutoModel`` in eval mode (it is put into
@@ -92,7 +100,7 @@ def embed_texts(
         raise ValueError("texts must be non-empty")
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
-    tokenizer, model = _resolve_tokenizer_model(tokenizer, model, model_name)
+    tokenizer, model = _resolve_tokenizer_model(tokenizer, model, model_name, revision)
     device = _resolve_device(device)
     model = model.to(device).eval()
 
