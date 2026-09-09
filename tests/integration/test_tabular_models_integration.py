@@ -88,3 +88,35 @@ def test_wine_seed_reproducibility(wine):
     imp_a = _fit("wine", x, y).get_explanation(x)
     imp_b = _fit("wine", x, y).get_explanation(x)
     assert np.allclose(imp_a, imp_b)
+
+
+def test_breast_cancer_fidelity_and_rank_agreement():
+    """Real-data anchor (sandbox D1): RF black box, RoT fidelity + rank agreement.
+
+    Uses the sklearn-bundled dataset (no downloads); bars sit below the
+    sandbox's measured linear 0.930 / rbf 0.909 fidelity and 0.468 spearman
+    against permutation importance.
+    """
+    from scipy.stats import spearmanr
+    from sklearn.datasets import load_breast_cancer
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.inspection import permutation_importance
+    from sklearn.model_selection import train_test_split
+
+    data = load_breast_cancer()
+    x_all = data.data.astype(np.float32)
+    xtr, xte, ytr, yte = train_test_split(x_all, data.target, test_size=0.25, random_state=0)
+    bb = RandomForestClassifier(n_estimators=200, random_state=0, n_jobs=-1)
+    bb.fit(xtr, ytr)
+    ybb_tr = bb.predict(xtr).astype(np.int64)
+    ybb_te = bb.predict(xte).astype(np.int64)
+
+    exp = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0)
+    assert rot_accuracy(exp, xte, ybb_te) >= 0.85
+
+    shaped = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, nonlinear="rbf")
+    assert rot_accuracy(shaped, xte, ybb_te) >= 0.85
+
+    rot_scores = np.abs(exp.get_explanation(xte)).mean(0)
+    perm = permutation_importance(bb, xte, yte, n_repeats=5, random_state=0)
+    assert spearmanr(rot_scores, perm.importances_mean).statistic > 0.3

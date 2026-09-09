@@ -115,3 +115,24 @@ def test_word_clouds_single_sign_renders():
     all_negative = [-row for row in all_positive]
     assert isinstance(plot.word_clouds(all_negative, tokens_lists, seed=0), Figure)
     plt.close("all")
+
+
+@pytest.mark.parametrize("power,trim", [(0.5, 1.0), (1.0, 2.0), (2.0, 5.0)])
+def test_saliency_parameter_sweep_renders(power, trim):
+    rng = np.random.RandomState(0)
+    heat = rng.randn(8, 8).astype(np.float32)
+    assert isinstance(plot.saliency(heat, power=power, trim=trim), Figure)
+    plt.close("all")
+
+
+@pytest.mark.parametrize("class_idx", [0, 1, 2])
+def test_multiclass_per_class_plots_render(class_idx):
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(5)
+    x = rng.randn(48, 4).astype(np.float32)
+    y = (x[:, 0] > 0).astype(np.int64) + (x[:, 1] > 0).astype(np.int64)
+    exp = fit_tabular(y, x, epochs=8, batch_size=48, learning_rate=0.05, seed=0, n_classes=3)
+    assert isinstance(plot.bar(exp, x, class_idx=class_idx), Figure)
+    assert isinstance(plot.waterfall(exp, x[:1], class_idx=class_idx), Figure)
+    plt.close("all")

@@ -34,13 +34,13 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 11 files | 147 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 13 files | 160 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 9 files | 58 | Committed artifacts + live HF/MobileNet features, RoT fitted live |
 
-Per-file counts: test_core 18, test_embed 14, test_explain 23, test_image 16,
-test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 13,
+Per-file counts: test_calibrated 4, test_core 18, test_embed 14, test_explain 23, test_faithfulness 3,
+test_image 16, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
 test_text 12, test_tune 9, test_vision 5, gpt_pet 5, image 13, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 10, text 10, tune 3. Total 206.
+plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 220.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -225,7 +225,7 @@ unless noted.
 | `test_multiclass_explanation_shape_and_fidelity` | Shape `(N,10,d)`; accuracy `>=0.5` (measured 0.976) |
 | `test_multiclass_confusion_counts_match_active_samples` | Per-step confusion counts consistent |
 
-### `tests/integration/test_tabular_models_integration.py` (10)
+### `tests/integration/test_tabular_models_integration.py` (11)
 
 | Test | Checks |
 | --- | --- |
@@ -239,6 +239,7 @@ unless noted.
 | `test_reveal_curve_endpoint_equals_full_accuracy[compas]` | Endpoint == accuracy |
 | `test_reveal_curve_endpoint_equals_full_accuracy[wine]` | Endpoint == accuracy |
 | `test_wine_seed_reproducibility` | Identical importances across fits |
+| `test_breast_cancer_fidelity_and_rank_agreement` | Linear/rbf fidelity `>=0.85` (measured 0.965); spearman vs permutation `>0.3` (measured 0.62) |
 
 ### `tests/integration/test_text_integration.py` (10)
 
@@ -322,12 +323,24 @@ Pins for save/load: round-trip identical outputs (tabular/text/image);
 `mins`/`maxs` restored; `device=` on load; foreign files rejected;
 exact version-match enforcement (mismatch + missing stamp rejected).
 
-### `tests/test_plot.py` (13)
+### `tests/test_plot.py` (19)
 
 Pins for `rot.plot`: single-row figures (waterfall/force/decision);
 batch figures (bar/beeswarm); values/base use class bias; HTML sign colours;
 max-tokens truncation; matplotlib text figure; saliency with/without image;
+saliency power/trim sweep; multiclass per-class bar/waterfall;
 nonpositive power rejected; word clouds figure + single-sign panels.
+
+### `tests/test_calibrated.py` (4)
+
+Pins for calibrated ground-truth fixtures (xai-units lesson, reimplemented):
+exact handcrafted linear black box; rank/top-k/sign recovery vs `|w|`;
+multiclass per-class top-1; interacting labels trip the quality wire.
+
+### `tests/test_faithfulness.py` (3)
+
+Pins for faithfulness probes on known mechanisms: tabular deletion gap;
+localized-square pointing-game; noise columns below signal.
 
 ### `tests/test_text.py` (12)
 
