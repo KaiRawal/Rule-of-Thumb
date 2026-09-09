@@ -57,6 +57,10 @@ pip install -e ".[dev]"
 pytest
 ```
 
+Full contributor guide (checks, CI, releasing):
+`docs-src/development.md`, rendered at
+https://rule-of-thumb.readthedocs.io/en/latest/development.html.
+
 To build the docs site locally (from the repo root, one command — stages
 the `examples/` notebooks under `docs-src/notebooks/` (gitignored),
 re-executes them, and validates links; output goes to a temp dir, nothing

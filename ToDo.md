@@ -74,8 +74,6 @@ are provenance notes only; the legacy code did not move with the package.
 
 ## Release / maintenance
 
-17. CI workflow: GitHub Actions running `pytest` + `ruff check .` on push/PR,
-    enforcing the definition-of-done mechanically.
 18. PyPI release checklist: build sdist + wheel, twine upload, tag releases
     consistently with the three-place version bump (`pyproject.toml`,
     `src/ruleofthumb/__init__.py`, `tests/test_explain.py` assertion).
@@ -99,8 +97,11 @@ are provenance notes only; the legacy code did not move with the package.
    documentation website (closes item 19): modality guides with executed
    notebooks, workflows, migration notes, capacity guidance, per-module API
    reference, and the test-suite report — built with one command
-   (`sphinx-build -W`), hosted on ReadTheDocs (versions + previews; no CI
-   per deferred item 17). Type annotations added to the five public
+   (`sphinx-build -W`), hosted on ReadTheDocs (versions + previews). GitHub
+   Actions added (item 17): checks (pytest/ruff/sphinx) on push/PR,
+   TestPyPI on `main` pushes, tag-gated PyPI releases via trusted
+   publishing; ritual documented in `docs-src/development.md`. Type
+   annotations added to the five public
   functions griffe flagged (`embed_texts`, `autotune`, `load_images`,
   `load_explainer`, `plot.saliency`); behaviour unchanged. No behaviour change.
 - **v0.2.19** — opt-in non-linear additive explanations: every factory and

@@ -52,7 +52,8 @@ in the changelog entry.
 ├── .gitignore
 ├── docs-src/ + conf.py     # docs source (Sphinx/MyST: guides, executed notebooks, API, test report)
 ├── .readthedocs.yaml       # RTD hosting config (no built HTML is ever committed)
-├── PUBLISH.md              # PyPI + RTD release runbook (do not publish from CI)
+├── .github/workflows/      # CI: checks on push/PR, TestPyPI on main, PyPI on v* tags (OIDC, no tokens)
+├── PUBLISH.md              # PyPI + RTD release runbook (CI publishes; tags are the only trigger)
 ├── requirements.txt        # pinned env matching pyproject (convenience)
 ├── ToDo.md                 # forward-looking package TODOs + changelog footer
 ├── README.md               # user docs incl. v0.1→v0.2 migration guide
@@ -156,3 +157,4 @@ Before finishing any change:
       `tests/test_explain.py`.
 - [ ] Untracked caches cleaned up: `__pycache__/`, `.pytest_cache/`,
       `.ruff_cache/` (all gitignored, but keep the tree tidy).
+- [ ] CI green on the push/PR (`check.yml` runs the same trio).

@@ -3,14 +3,16 @@
 > ⚠️ Experimental 0.0.x pre-alpha — entirely vibe-coded from hand-written
 > research code. May break; backwards-incompatible changes expected.
 
-This runbook takes the repo from "ready" to "public". Nothing here
-publishes automatically — every upload/tag/push is a manual command you
-run. Do not commit from automation; review `git status` first.
+This runbook takes the repo from "ready" to "public". TestPyPI and PyPI
+uploads run in CI (see the development guide); tagging, pushing, and the
+dashboard steps stay manual. Do not commit from automation; review
+`git status` first.
 
 ## 0. Prerequisites
 
-- PyPI account + API token (`Account Settings → API tokens`). Store as
-  `$PYPI_TOKEN`; for the dry run, a TestPyPI token as `$TEST_PYPI_TOKEN`.
+- Trusted publishers registered (one-time setup, see the development
+  guide): PyPI → `release.yml`, TestPyPI → `testpypi.yml`. No API tokens
+  are used anywhere.
 - `uv` installed (this repo uses the `uv_build` backend; `uv build` is
   the only supported build command).
 - ReadTheDocs account with this repo connected (one-time setup, see §5).
@@ -42,10 +44,14 @@ is committed):
 .venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site
 ```
 
-## 2. Dry run: TestPyPI
+## 2. Dry run: TestPyPI (automatic on every `main` push)
+
+`testpypi.yml` builds and uploads on each merge — check the run, then the
+project page. Manual fallback (same commands CI runs):
 
 ```bash
-uv publish --publish-url https://test.pypi.org/legacy/ --token "$TEST_PYPI_TOKEN"
+uv build
+uv publish --publish-url https://test.pypi.org/legacy/
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ruleofthumb-rot==0.0.1
 python -c "import ruleofthumb as rot; print(rot.__version__)"
 ```
@@ -54,18 +60,17 @@ Check the TestPyPI project page renders: title, README (with the
 experimental banner), MIT licence, Homepage/Repository/Issues/
 Documentation links.
 
-## 3. Publish: PyPI
+## 3. Publish: PyPI (automatic on `v*` tags)
 
-```bash
-uv publish --token "$PYPI_TOKEN"
-```
+Pushing the tag from §4 triggers `release.yml`, which builds and uploads
+via trusted publishing. Manual fallback: `uv build` then `uv publish`.
 
 Then confirm on `https://pypi.org/p/ruleofthumb-rot/`:
 
 - Version `0.0.1`, licence MIT, Python `>=3.9`.
 - README banner visible; `project.urls` all resolve.
 
-## 4. Tag and push (manual)
+## 4. Tag and push (manual — the release trigger)
 
 ```bash
 git status --short   # review before committing
@@ -81,9 +86,9 @@ Open the release notes from the tag, pasting the `ToDo.md`
 ## 5. Docs on ReadTheDocs (one-time setup, then automatic)
 
 No built HTML is ever committed — RTD builds the site itself from
-`docs-src/` + `.readthedocs.yaml` on every push and tag. No CI workflows
-in this repo (deferred with ToDo item 17); RTD's own builder is the only
-automation.
+`docs-src/` + `.readthedocs.yaml` on every push and tag. GitHub Actions
+handles checks and package uploads (see the development guide); RTD
+handles docs.
 
 One-time setup (in the RTD dashboard):
 
@@ -92,7 +97,7 @@ One-time setup (in the RTD dashboard):
    3.10, `requirements.txt`, `pip install .`, Sphinx at
    `docs-src/conf.py`).
 3. First build runs automatically; confirm the site renders at
-   `https://rot.readthedocs.io/` — Home, Guides, executed
+   `https://rule-of-thumb.readthedocs.io/` — Home, Guides, executed
    Notebooks, Migration, Capacity, API, Test report.
 4. Under `Admin → Versions`, activate the `v0.0.1` tag build so
    `stable` tracks the release; `latest` tracks `main`.
@@ -163,7 +168,7 @@ instead of pytest; then confirm the RTD `latest` build for the push.
 |---|---|
 | `uv build` errors on backend | Check `[build-system]` = `uv_build>=0.12.10,<0.13` / `uv_build`; run with `RUST_LOG=uv=debug uv build`. |
 | Sdist missing `LICENSE`/`README` | Check `license-files = ["LICENSE*"]` and `readme = "README.md"`; `LICENSE` must sit next to `pyproject.toml`. |
-| `uv publish` 403 | Token scope (project vs account), or name taken — confirm `pypi.org/p/ruleofthumb-rot/` (mint a token scoped to the new name if the old one was project-scoped). |
+| CI publish job 403 | Trusted publisher misconfigured (owner/repo/workflow typo) or version number reused — PyPI never reuses versions. There are no tokens to expire. |
 | `sphinx-build -W` warnings as errors | Fix the flagged link/docstring, don't drop `-W`. |
 | Stale notebook outputs in the site | Clear the execution cache (`rm -rf .jupyter_cache`) and rebuild; changed notebooks re-run automatically. |
 | RTD build fails | Check `.readthedocs.yaml` (Python version, requirements path); reproduce locally with the §1 command; RTD needs `requirements.txt` to install cleanly on Ubuntu. |
