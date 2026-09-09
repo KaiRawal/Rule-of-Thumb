@@ -1,9 +1,21 @@
-# ruleofthumb
+# Rule of Thumb
+
+[![PyPI](https://img.shields.io/pypi/v/ruleofthumb-rot)](https://pypi.org/project/ruleofthumb-rot/)
+[![Docs](https://img.shields.io/readthedocs/rule-of-thumb)](https://rule-of-thumb.readthedocs.io/)
+[![License](https://img.shields.io/github/license/KaiRawal/Rule-of-Thumb)](https://github.com/KaiRawal/Rule-of-Thumb/blob/main/LICENSE)
+[![Python](https://img.shields.io/pypi/pyversions/ruleofthumb-rot)](https://pypi.org/project/ruleofthumb-rot/)
 
 > ⚠️ **Experimental 0.0.x pre-alpha.** This package was entirely vibe-coded
 > from hand-written research code. It may break, and backwards-incompatible
 > changes are expected before any 1.0. Verify explanations before trusting
 > them.
+
+Explaining AI systems using partial information — a pip-installable
+library consolidating the Rule of Thumb (RoT) explainer into one package.
+
+- 📄 Paper: https://arxiv.org/abs/2608.10766
+- 🌐 Project website: https://kairawal.github.io/Rule-of-Thumb-Explaining-Artificial-Intelligence-Systems-using-Partial-Information/website/
+- 🔬 Research code: https://github.com/KaiRawal/Rule-of-Thumb-Explaining-Artificial-Intelligence-Systems-using-Partial-Information
 
 Rule of Thumb (RoT) trains a simple, transparent surrogate on partial
 observations of a black-box model's behaviour, producing per-feature

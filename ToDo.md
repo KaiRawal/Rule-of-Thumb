@@ -74,9 +74,11 @@ are provenance notes only; the legacy code did not move with the package.
 
 ## Release / maintenance
 
-18. PyPI release checklist: build sdist + wheel, twine upload, tag releases
-    consistently with the three-place version bump (`pyproject.toml`,
-    `src/ruleofthumb/__init__.py`, `tests/test_explain.py` assertion).
+18. PyPI release checklist: three-place version bump (`pyproject.toml`,
+    `src/ruleofthumb/__init__.py`, `tests/test_explain.py` assertion) plus
+    `ToDo.md` changelog entry, then commit, push, and tag — CI builds and
+    uploads (TestPyPI on `main`, PyPI on `v*` tags via trusted publishing),
+    RTD rebuilds; verify each stage per PUBLISH.md.
 
 ## Non-goals
 
