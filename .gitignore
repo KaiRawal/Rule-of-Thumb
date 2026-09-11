@@ -20,3 +20,4 @@ docs-src/notebooks/
 docs-src/_build/
 .jupyter_cache/
 .cache/
+.DS_Store
