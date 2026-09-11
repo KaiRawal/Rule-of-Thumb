@@ -55,7 +55,7 @@ with `tests/integration/mint_pet_weights.py` if the model or fit changes.
 | Event | What runs | Effect |
 |---|---|---|
 | Push / pull request | `check.yml`: ruff + pytest + docs build | Red status blocks the merge; nothing deploys |
-| Push to `main` | `testpypi.yml`: stamp `0.0.1.dev<RUN_NUMBER>`, build + upload | Per-commit TestPyPI release; packaging breakage surfaces immediately |
+| Push to `main` | `testpypi.yml`: stamp `<base>.dev<RUN_NUMBER>`, build + upload | Per-commit TestPyPI release; packaging breakage surfaces immediately |
 | Push of tag `v*` | `release.yml`: build + upload to PyPI | Live release; the tag is the only trigger |
 | Push to `main` / new tag | ReadTheDocs | `latest` rebuilds on push; `stable` follows activated tags |
 
@@ -74,7 +74,7 @@ not be invented: if it isn't tagged, it isn't released.
 4. Run the §Everyday checks trio locally; rebuild docs to `/tmp`.
 5. Commit, review `git status`, push to `main`. CI runs checks, uploads
    to TestPyPI, and RTD rebuilds `latest` — confirm each is green.
-6. Tag and push the tag: `git tag v0.0.2 && git push origin main --tags`.
+6. Tag and push the tag: `git tag vX.Y.Z && git push origin main --tags`.
    The release workflow uploads to PyPI.
 7. Confirm on `https://pypi.org/project/ruleofthumb-rot/`: version,
    MIT licence, README banner, all four `project.urls`.

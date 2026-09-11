@@ -28,7 +28,7 @@ Requires Python >= 3.9. A single install ships everything (core + plotting
 + LLM/vision helpers):
 
 ```bash
-pip install ruleofthumb-rot==0.0.1
+pip install ruleofthumb-rot
 ```
 
 From source (this repo's root):

@@ -18,14 +18,15 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - name: Stamp per-commit dev version
         run: |
-          DEV_VER="0.0.1.dev${GITHUB_RUN_NUMBER}"
-          echo "Stamping TestPyPI version: $DEV_VER"
+          BASE_VER="$(grep -m1 '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')"
+          DEV_VER="${BASE_VER}.dev${GITHUB_RUN_NUMBER}"
+          echo "Stamping TestPyPI version: $DEV_VER (base $BASE_VER)"
           python - "$DEV_VER" <<'EOF'
           import re
           import sys
 
           dev_ver = sys.argv[1]
-          assert re.fullmatch(r"0\.0\.1\.dev\d+", dev_ver), dev_ver
+          assert re.fullmatch(r"\d+\.\d+\.\d+\.dev\d+", dev_ver), dev_ver
 
           path = "pyproject.toml"
           text = open(path).read()

@@ -1,4 +1,4 @@
-# Publishing `ruleofthumb-rot` v0.0.1 to PyPI (+ docs on ReadTheDocs)
+# Publishing `ruleofthumb-rot` to PyPI (+ docs on ReadTheDocs)
 
 > ⚠️ Experimental 0.0.x pre-alpha — entirely vibe-coded from hand-written
 > research code. May break; backwards-incompatible changes expected.
@@ -18,21 +18,23 @@ dashboard steps stay manual. Do not commit from automation; review
 - ReadTheDocs account with this repo connected (one-time setup, see §5).
 - Clean tree on `main`.
 - Version pinned in all three places: `pyproject.toml`,
-  `src/ruleofthumb/__init__.py`, `tests/test_explain.py` (all `0.0.1`).
+  `src/ruleofthumb/__init__.py`, `tests/test_explain.py` (all the same
+  `X.Y.Z`).
 
 ## 1. Final verification (repo root, venv only)
 
 ```bash
+VER="$(grep -m1 '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')"
 .venv/bin/python -m pytest
 .venv/bin/python -m ruff check .
 uv build
-tar tzf dist/ruleofthumb_rot-0.0.1.tar.gz | head -n 20  # LICENSE + README present
-pip install dist/ruleofthumb_rot-0.0.1-py3-none-any.whl --force-reinstall
+tar tzf dist/ruleofthumb_rot-$VER.tar.gz | head -n 20  # LICENSE + README present
+pip install dist/ruleofthumb_rot-$VER-py3-none-any.whl --force-reinstall
 python -c "import ruleofthumb as rot; print(rot.__version__)"
 ```
 
 Expected: pytest green, ruff clean, `dist/` holds exactly one sdist +
-one wheel, import prints `0.0.1`. Delete and rebuild `dist/` if stale
+one wheel, import prints `$VER`. Delete and rebuild `dist/` if stale
 artifacts linger (`rm -rf dist/ && uv build`).
 
 Docs build (one command, venv only — stages the `examples/` notebooks as
@@ -46,16 +48,16 @@ is committed):
 
 ## 2. Dry run: TestPyPI (automatic on every `main` push)
 
-`testpypi.yml` stamps a per-commit dev version (`0.0.1.dev<RUN_NUMBER>`,
+`testpypi.yml` stamps a per-commit dev version (`<base>.dev<RUN_NUMBER>`,
 patched into `pyproject.toml` + `__version__` in the CI workspace only —
-the repo stays at `0.0.1`) so every merge uploads a unique distribution;
-re-runs fall back to `skip-existing`. Check the run, then the project page.
-Manual fallback (same commands CI runs):
+the repo keeps its release version) so every merge uploads a unique
+distribution; re-runs fall back to `skip-existing`. Check the run, then the
+project page. Manual fallback (same commands CI runs):
 
 ```bash
 uv build
 uv publish --publish-url https://test.pypi.org/legacy/
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ruleofthumb-rot==0.0.1
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ruleofthumb-rot==<version>
 python -c "import ruleofthumb as rot; print(rot.__version__)"
 ```
 
@@ -70,7 +72,7 @@ via trusted publishing. Manual fallback: `uv build` then `uv publish`.
 
 Then confirm on `https://pypi.org/p/ruleofthumb-rot/`:
 
-- Version `0.0.1`, licence MIT, Python `>=3.9`.
+- Version `X.Y.Z`, licence MIT, Python `>=3.9`.
 - README banner visible; `project.urls` all resolve.
 
 ## 4. Tag and push (manual — the release trigger)
@@ -78,13 +80,13 @@ Then confirm on `https://pypi.org/p/ruleofthumb-rot/`:
 ```bash
 git status --short   # review before committing
 git add -A
-git commit -m "feat: first public pre-alpha v0.0.1 (uv_build, docs, PyPI metadata)"
-git tag v0.0.1
+git commit -m "release X.Y.Z"
+git tag vX.Y.Z
 git push origin main --tags
 ```
 
-Open the release notes from the tag, pasting the `ToDo.md`
-`v0.0.1` changelog entry.
+Open the release notes from the tag, pasting the matching `ToDo.md`
+changelog entry.
 
 ## 5. Docs on ReadTheDocs (one-time setup, then automatic)
 
@@ -102,7 +104,7 @@ One-time setup (in the RTD dashboard):
 3. First build runs automatically; confirm the site renders at
    `https://rule-of-thumb.readthedocs.io/` — Home, Guides, executed
    Notebooks, Migration, Capacity, API, Test report.
-4. Under `Admin → Versions`, activate the `v0.0.1` tag build so
+4. Under `Admin → Versions`, activate the new tag build so
    `stable` tracks the release; `latest` tracks `main`.
 
 Per release, nothing docs-specific is required: pushing the tag rebuilds
@@ -130,7 +132,7 @@ Notes:
 
 ## 6. Managing upgrades
 
-### New package version (e.g. `0.0.2`)
+### New package version (e.g. `X.Y.Z`)
 
 1. Make the behaviour change; update README (usage + migration notes).
 2. Bump all three version sites: `pyproject.toml`,
@@ -158,8 +160,8 @@ Concretely: bump the pin in `requirements.txt`, reinstall the repo venv
 full §1 verification, and commit `requirements.txt` (+ `pyproject.toml`
 bounds if the upgrade needs a new minimum). One dependency per commit so
 bisects stay useful. Never reuse a published version number after a
-dependency change — if `0.0.1` is already on PyPI, the upgrade ships as
-`0.0.2` per §6 above.
+dependency change — if the current version is already on PyPI, the upgrade
+ships as the next version per §6 above.
 
 Docs-stack upgrades (`sphinx`, `myst-nb`, `pydata-sphinx-theme`,
 `sphinx-copybutton`) follow the same flow, verified by the §1 docs build
