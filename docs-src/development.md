@@ -52,7 +52,6 @@ for exact cross-machine reproduction; GPU coverage is split out:
 | Push to `main` | `testpypi.yml`: stamp `0.0.1.dev<RUN_NUMBER>`, build + upload | Per-commit TestPyPI release; packaging breakage surfaces immediately |
 | Push of tag `v*` | `release.yml`: build + upload to PyPI | Live release; the tag is the only trigger |
 | Push to `main` / new tag | ReadTheDocs | `latest` rebuilds on push; `stable` follows activated tags |
-| Manual dispatch | `mint-pet-reference.yml`: mint the x86_64 pet anchor | Uploads `pet-reference-x86_64`; install locally with `tests/integration/install_pet_reference.py`, then commit + push |
 
 Nothing publishes to live PyPI on a branch push, a PR merge, or a
 version bump — only a tag. Commit-message flags do not exist and must

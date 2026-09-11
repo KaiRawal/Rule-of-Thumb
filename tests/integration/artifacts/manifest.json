@@ -87,6 +87,16 @@
         ]
       }
     },
+    "pet_reference_explanations.x86_64.npz": {
+      "sha256": "c294f32e0fda6295923583f91e98a44e0194a87265e7109c82237fb4af289fdd",
+      "shapes": {
+        "heatmaps": [
+          20,
+          7,
+          7
+        ]
+      }
+    },
     "pets_labels.csv": {
       "sha256": "d4ebee4a32e2509df067d9d09e7a0278dbe609737b5582fe5fbb759f1e0ac7b7"
     },
