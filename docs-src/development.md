@@ -38,11 +38,17 @@ for exact cross-machine reproduction; GPU coverage is split out:
   local `pytest` exercises MPS automatically on Apple Silicon, while
   CPU-only CI runs the CPU leg and skips the rest.
 - To run the whole integration tier on an accelerator instead
-  (exploratory — the committed reference anchors assume CPU):
-  `ROT_TEST_DEVICE=mps pytest tests/integration -q -p no:cacheprovider`
-  (or `=cuda` where available). Docs are written in MyST markdown under
-`docs-src/`; cross-page anchors need explicit `(label)=` targets (plain
-`page.md#header` links fail `-W`).
+  (exploratory): `ROT_TEST_DEVICE=mps pytest tests/integration -q
+  -p no:cacheprovider` (or `=cuda` where available). Docs are written in
+  MyST markdown under `docs-src/`; cross-page anchors need explicit
+  `(label)=` targets (plain `page.md#header` links fail `-W`).
+
+The pets heatmap anchor loads committed fitted weights
+(`pet_rot_state.pt`, raw state dict — never `.rotx`, whose version stamp
+would break the fixture on every release) instead of refitting: the
+300-epoch fit amplifies last-ulp host differences across machines, while
+the forward pass is stable to ulp level. Remint both artifacts together
+with `tests/integration/mint_pet_weights.py` if the model or fit changes.
 
 ## Automation map
 

@@ -34,7 +34,7 @@ timeout 600 .venv/bin/python -m ruff check .
 
 The suite writes only gitignored caches.
 
-## 3. Suite summary (222 tests, all passing 2026-09-09)
+## 3. Suite summary (222 tests, all passing 2026-09-11)
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
@@ -71,7 +71,8 @@ text `epochs=200, batch_size=500, learning_rate=0.05, seed=0`.
 | `reviews.txt` | 4K | Fixed film-review snippets, one per line |
 | `pets_labels.csv` | 4K | 20 rows: filename, ground_truth, gpt_label |
 | `pet_images/` | 700K | 20 raw cat/dog JPEGs (10/class) |
-| `pet_reference_explanations.npz` | 4K | `heatmaps` (20,7,7) regression anchors |
+| `pet_reference_explanations.npz` | 4K | `heatmaps` (20,7,7) regression anchors (forward pass of `pet_rot_state.pt`) |
+| `pet_rot_state.pt` | 12K | Fitted `RoTImage` state dict for the pets fit (raw weights, not `.rotx`; minted via `mint_pet_weights.py`) |
 | `manifest.json` | 4K | sha256 + shapes provenance, env versions |
 
 ### 4b. Computed live at test time (never committed)
@@ -180,7 +181,7 @@ unless noted.
 | `test_feature_maps_shape` | Live MobileNet maps `(20,576,7,7)`, finite |
 | `test_gpt_labels_are_accurate_and_balanced` | Labels {cat,dog}; GPT-vs-truth `>=0.8` (measured 1.0) |
 | `test_rot_surrogate_accuracy_against_gpt_labels` | RoT-vs-GPT `>=0.85` (measured 1.0) |
-| `test_heatmaps_match_reference_explanations` | Shape (20,7,7); corr min `>=0.95`, mean `>=0.99`; both signs present |
+| `test_heatmaps_match_reference_explanations` | Committed weights (no training) reproduce the reference: loaded accuracy 1.0; shape (20,7,7); corr min `>=0.95`, mean `>=0.99`; both signs present |
 | `test_dog_images_highlight_the_dog_direction` | Mean dog-mass dogs>cats; corr(dog-mass, labels) `>=0.9` |
 
 ### `tests/integration/test_image_integration.py` (13)

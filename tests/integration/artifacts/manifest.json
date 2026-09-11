@@ -87,6 +87,9 @@
         ]
       }
     },
+    "pet_rot_state.pt": {
+      "sha256": "3c520c96b795f5a8709300dc6ab0300e8083d4fb241f73c241151d8805e973ca"
+    },
     "pets_labels.csv": {
       "sha256": "d4ebee4a32e2509df067d9d09e7a0278dbe609737b5582fe5fbb759f1e0ac7b7"
     },
