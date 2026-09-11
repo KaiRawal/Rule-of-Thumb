@@ -128,6 +128,10 @@ class RoT(torch.nn.Module):
     ):
         if seed is not None:
             torch.manual_seed(seed)
+        # Cap the batch at N: identical numerics to the full-batch fallback
+        # (slices are min-bounded below), but no step ever asks for more
+        # samples than exist, whatever the caller passes.
+        batch_size = min(batch_size, points.shape[0])
         self.training_loss = np.zeros(epochs)
         burn_in = epochs // 10 + 1 if swa_burn_in is None else swa_burn_in
         points = torch.as_tensor(points, device=self.device)

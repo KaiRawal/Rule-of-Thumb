@@ -410,6 +410,11 @@ custom callable over the binary counts `(tp, fp, fn, tn)`.
 
 - **Rectangular batches.** Inputs are stored as rectangular tensors; use
   `pad_sequences` / `pad_images` plus masks for ragged or mixed-size data.
+- **Memory on real-size inputs.** Factory defaults (`epochs=500`,
+  `batch_size=5000`) suit toy data; on real datasets pass explicit small
+  values (e.g. 96px images: `epochs=30`, `batch_size=16-64`) and keep
+  inputs in uint8 on disk, converting per batch. Batches larger than `N`
+  warn and run full-batch.
 - Reveal-curve granularity must match between `get_order` and
   `ordered_predict` / `score_ordering` (no auto-detection of the order's
   granularity).

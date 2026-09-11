@@ -34,17 +34,17 @@ timeout 600 .venv/bin/python -m ruff check .
 
 The suite writes only gitignored caches.
 
-## 3. Suite summary (222 tests, all passing 2026-09-11)
+## 3. Suite summary (224 tests)
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
 | Unit `tests/test_*.py` | 13 files | 160 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 10 files | 60 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU |
 
-Per-file counts: test_calibrated 4, test_core 18, test_embed 14, test_explain 23, test_faithfulness 3,
-test_image 16, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
+Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_faithfulness 3,
+test_image 17, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
 test_text 12, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, image 13, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 222.
+plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 224.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -290,12 +290,12 @@ device resolution/plumbing (cpu); dropout
 stochasticity; `mins`/`maxs` instance attrs; stable tie-break; SWA burn-in
 arg; fit hyperparameter args; fit + training-loop seeding.
 
-### `tests/test_embed.py` (14)
+### `tests/test_embed.py` (15)
 
 Pins for `embed_texts`/`TextEmbeddings`: shapes/masks/padding zeros; token
 alignment; batch invariance; truncation; tokenizer/model override rules;
 device arg; empty/bad-input rejections; `DEFAULT_TEXT_MODEL`; string routing
-through facade; strings+explicit-padding rejection; array-fitted string-query
+through facade; numpy string arrays route identically; strings+explicit-padding rejection; array-fitted string-query
 error.
 
 ### `tests/test_explain.py` (23)
@@ -309,12 +309,13 @@ hyperparameter threading; seeding;
 device; reveal delegation; `__version__ == "0.2.19"`; removed
 `RuleOfThumb`/`TextRuleOfThumb` absent.
 
-### `tests/test_image.py` (16)
+### `tests/test_image.py` (17)
 
 Pins for `RoTImage`/paths: importance shapes; fit/score; mask zeroing;
 mixed-size batch ≡ per-sample loop; padded fit; `pad_images`; facade binary
 pipeline with untrained conv box; padded-batch mask respect; `load_images`
-native/fixed/transform paths; warning-free decoding; path routing; path+mask rejection;
+native/fixed/transform paths; warning-free decoding; path routing; numpy path
+arrays route identically; path+mask rejection;
 path-on-array-fit error.
 
 ### `tests/test_masks.py` (14)

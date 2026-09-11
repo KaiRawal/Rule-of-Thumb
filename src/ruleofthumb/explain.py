@@ -31,7 +31,15 @@ _IMAGE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp",
 
 
 def _is_string_batch(x):
-    """True when ``x`` is a non-empty list/tuple of raw strings."""
+    """True when ``x`` is a non-empty batch of raw strings.
+
+    Accepts lists, tuples and 1-D numpy string arrays: ``np.str_`` elements
+    already satisfy ``isinstance(s, str)``, so only the container check needs
+    the extra branch (a numpy batch otherwise falls through to the numeric
+    path and fails deep inside torch).
+    """
+    if isinstance(x, np.ndarray):
+        return x.ndim == 1 and x.size > 0 and x.dtype.kind in "SUO" and all(isinstance(s, str) for s in x.flat)
     return isinstance(x, (list, tuple)) and len(x) > 0 and all(isinstance(s, str) for s in x)
 
 

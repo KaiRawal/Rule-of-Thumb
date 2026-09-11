@@ -169,6 +169,23 @@ def test_facade_methods_accept_strings(stubs):
     assert preds.shape[0] == 3
 
 
+def test_numpy_string_arrays_route_to_text(stubs):
+    """Numpy string batches behave exactly like lists (np.str_ is str)."""
+    from ruleofthumb import fit_text
+
+    tokenizer, model = stubs
+    y = np.array([0, 1, 0])
+    texts = ["a bb", "ccc", "dddd ee"]
+    arr = np.array(texts)
+    exp = fit_text(y, texts, tokenizer=tokenizer, model=model, epochs=2, batch_size=3, learning_rate=0.05)
+
+    assert np.allclose(exp.get_explanation(arr), exp.get_explanation(texts))
+    assert np.array_equal(
+        exp.predict(arr).cpu().numpy(), exp.predict(texts).cpu().numpy()
+    )
+    assert np.array_equal(exp.get_order(arr), exp.get_order(texts))
+
+
 def test_strings_with_explicit_padding_rejected(stubs):
     from ruleofthumb import fit_text
 

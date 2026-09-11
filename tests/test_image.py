@@ -234,6 +234,21 @@ def test_facade_methods_accept_paths(png_paths):
     assert preds.shape[0] == 2
 
 
+def test_numpy_path_arrays_route_to_image(png_paths):
+    """Numpy path batches behave exactly like lists (path-fitted predict)."""
+    from ruleofthumb import fit_image
+
+    y = np.array([0, 1])
+    arr = np.array(png_paths)
+    exp = fit_image(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
+
+    assert np.allclose(exp.get_explanation(arr), exp.get_explanation(png_paths))
+    assert np.array_equal(
+        exp.predict(arr).cpu().numpy(), exp.predict(png_paths).cpu().numpy()
+    )
+    assert np.array_equal(exp.get_order(arr), exp.get_order(png_paths))
+
+
 def test_paths_with_explicit_mask_rejected(png_paths):
     from ruleofthumb import fit_image
 
