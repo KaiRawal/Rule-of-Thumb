@@ -273,7 +273,7 @@ def test_explainer_delegates_reveal_pipeline(tabular_data):
 def test_package_exports():
     import ruleofthumb as rot
 
-    assert rot.__version__ == "0.0.1"
+    assert rot.__version__ == "0.0.2"
     for name in ("Explainer", "fit", "fit_tabular", "fit_text", "fit_image", "RoT"):
         assert hasattr(rot, name)
     for removed in ("RuleOfThumb", "TextRuleOfThumb"):

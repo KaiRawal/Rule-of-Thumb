@@ -116,6 +116,22 @@ are provenance notes only; the legacy code did not move with the package.
 
 ## Changelog
 
+- **v0.0.2** — breaking padding-API cleanup plus robustness hardening over
+  the published v0.0.1. Breaking: text/image entry points speak a single
+  `mask=` spelling — the `lengths=` / `attention_mask=` kwargs are gone
+  (build masks with the newly exported `lengths_to_mask`) and the
+  `sentinel_mask` migration helper is deleted. New: `ruleofthumb.vision`
+  module (`embed_images` / `ImageEmbeddings` / `DEFAULT_IMAGE_MODEL`,
+  the default backbone for image file paths); `embed_texts` gains
+  `revision=` (pinned to the new `DEFAULT_TEXT_REVISION` by default);
+  `autotune` forwards `n_classes` and extra factory kwargs to candidates
+  and the final refit. Behaviour: out-of-range labels fail fast with a
+  clear error, inference entry points always return host-side results,
+  oversized batches and low train agreement (`train_agreement_`) warn,
+  read-only input arrays are accepted silently, and explainer save files
+  load only under the exact package version that wrote them. No change to
+  the linear surrogate itself; omitting the new arguments keeps prior
+  behaviour.
 - **v0.0.1** — first public pre-alpha (version reset from internal v0.2.19
   to reserve the PyPI name (`ruleofthumb-rot`) and invite early feedback). Entirely vibe-coded
   from hand-written research code; expect breakage and

@@ -13,7 +13,7 @@ from ruleofthumb.text import lengths_to_mask, pad_sequences
 from ruleofthumb.tune import AutotuneResult, autotune
 from ruleofthumb.vision import DEFAULT_IMAGE_MODEL, ImageEmbeddings, embed_images
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 __all__ = [
     "DEFAULT_IMAGE_MODEL",

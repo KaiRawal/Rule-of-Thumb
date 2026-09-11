@@ -3,6 +3,15 @@
 Breaking changes across the 0.x line. The package is pre-1.0: breaking
 API changes are acceptable, each one recorded here.
 
+## Migrating to v0.0.2
+
+v0.0.2 removes the deprecated padding spellings: `lengths=` and
+`attention_mask=` kwargs are gone from every entry point — pass a single
+boolean validity mask as `mask=` (build it from lengths with
+`lengths_to_mask`), and the `sentinel_mask` helper is deleted. Save files
+now load only under the exact package version that wrote them — refit and
+re-save after upgrading.
+
 ## Migrating from v0.1 sentinel padding
 
 v0.2 removed the implicit `-1` sentinel: **no fill value has special
@@ -12,18 +21,13 @@ meaning any more**. Padding is now always explicit via a validity mask
 ```python
 # v0.1 (implicit): pad with -1, the model inferred padding from the data
 x[:, n_tokens:] = -1.0
-rot = TextRuleOfThumb(y, x)
-exp = rot.get_explanation(x)
+exp = rot.fit_text(y_outputs=y, x_inputs=x)
 
 # v0.2 (explicit): keep any pad value you like, but pass the mask yourself
 x[:, n_tokens:] = 0.0                                # any value works now
-lengths = torch.tensor([n_tokens] * len(x))          # or a (N, T) boolean mask
-rot = TextRuleOfThumb(y, x, lengths=lengths)         # or attention_mask=...
-exp = rot.get_explanation(x, lengths=lengths)
-
-# Migrating an existing -1-padded array? Rebuild its mask in one line:
-from ruleofthumb.text import sentinel_mask
-mask = sentinel_mask(x_old)                          # True where tokens are real
+mask = torch.zeros(x.shape[0], x.shape[1], dtype=torch.bool)
+mask[:, :n_tokens] = True                            # or lengths_to_mask(lengths, T)
+exp = rot.fit_text(y_outputs=y, x_inputs=x, mask=mask)
 ```
 
 Without a mask every position is treated as real data — padded positions
@@ -44,8 +48,9 @@ rot = TextRuleOfThumb(y_outputs=y, x_inputs=x, lengths=lengths)
 
 # v0.2.10+
 import ruleofthumb
+from ruleofthumb.text import lengths_to_mask
 exp = ruleofthumb.fit(y_outputs=y, x_inputs=X)                    # modality auto-detected
-exp = ruleofthumb.fit_text(y_outputs=y, x_inputs=x, lengths=lengths)
+exp = ruleofthumb.fit_text(y_outputs=y, x_inputs=x, mask=lengths_to_mask(lengths, x.shape[1]))
 ```
 
 The fitted explainer exposes the same `get_explanation` semantics, plus

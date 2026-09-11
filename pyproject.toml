@@ -8,7 +8,7 @@ module-name = "ruleofthumb"
 
 [project]
 name = "ruleofthumb-rot"
-version = "0.0.1"
+version = "0.0.2"
 description = "Rule of Thumb: explaining AI systems using partial information (experimental 0.0.x)"
 readme = "README.md"
 license = "MIT"
