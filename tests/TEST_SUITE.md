@@ -71,7 +71,8 @@ text `epochs=200, batch_size=500, learning_rate=0.05, seed=0`.
 | `reviews.txt` | 4K | Fixed film-review snippets, one per line |
 | `pets_labels.csv` | 4K | 20 rows: filename, ground_truth, gpt_label |
 | `pet_images/` | 700K | 20 raw cat/dog JPEGs (10/class) |
-| `pet_reference_explanations.npz` | 4K | `heatmaps` (20,7,7) regression anchors |
+| `pet_reference_explanations.arm64.npz` | 4K | `heatmaps` (20,7,7) regression anchor, ARM64 (minted via `mint_pet_reference.py`) |
+| `pet_reference_explanations.x86_64.npz` | 4K | Same, x86_64 (minted by the `mint-pet-reference` workflow, installed via `install_pet_reference.py`) |
 | `manifest.json` | 4K | sha256 + shapes provenance, env versions |
 
 ### 4b. Computed live at test time (never committed)

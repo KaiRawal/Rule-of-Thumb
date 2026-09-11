@@ -77,7 +77,7 @@
         ]
       }
     },
-    "pet_reference_explanations.npz": {
+    "pet_reference_explanations.arm64.npz": {
       "sha256": "a5748806488fbddf50824c509899845b9d54d49ec931f70a4f2406095794c379",
       "shapes": {
         "heatmaps": [

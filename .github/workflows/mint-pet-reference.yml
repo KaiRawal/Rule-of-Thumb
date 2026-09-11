@@ -1,0 +1,35 @@
+name: mint-pet-reference
+
+# One-shot helper: mint the x86_64 pet reference anchor on a Linux runner.
+# Run manually from the Actions tab (workflow_dispatch), download the
+# artifact, and install it with
+# tests/integration/install_pet_reference.py. Never commits anything.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: astral-sh/setup-uv@v5
+      - name: Install
+        run: |
+          python -m venv .venv
+          uv pip install --python .venv/bin/python -r requirements.txt
+          uv pip install --python .venv/bin/python -e ".[dev,docs]"
+      - name: Mint x86_64 pet reference
+        run: .venv/bin/python tests/integration/mint_pet_reference.py
+      - name: Upload reference
+        uses: actions/upload-artifact@v4
+        with:
+          name: pet-reference-x86_64
+          path: tests/integration/artifacts/pet_reference_explanations.x86_64.npz
+          retention-days: 30
