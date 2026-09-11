@@ -48,7 +48,8 @@ plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 222.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
-text `epochs=200, batch_size=500, learning_rate=0.05, seed=0`.
+text `epochs=200, batch_size=500, learning_rate=0.05, seed=0` (native-string
+ingestion uses `epochs=50`: shorter fits resist cross-host amplification).
 
 ## 4. Artifacts
 

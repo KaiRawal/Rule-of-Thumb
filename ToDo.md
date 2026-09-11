@@ -12,6 +12,33 @@ are provenance notes only; the legacy code did not move with the package.
 
 ## API / correctness
 
+22. **Committed-weights robustness program for the test suite.** Long SGD
+    fits in underdetermined regimes land in different minima per BLAS
+    kernel, so no live-fit absolute floor is portable across hosts (seen:
+    pets heatmap corr `0.36–0.52` vs `1.0`, text native accuracy `0.65`
+    vs `1.0`, digits top-2 `0.80` vs `0.92`). Convert every test that
+    needs *a* fitted model rather than *the act of* fitting to load raw
+    `.pt` state dicts (pets template: `mint_pet_weights.py`): tabular (2
+    sets), tabular-models (7), text SST-2 (1–2), image
+    (binary/10-class/coords/rich), nonlinear pair, persistence round-trips
+    (fit incidental), plot rendering (reuse sets, zero new weights). Must
+    stay live: seed-reproducibility, tune search, native-ingestion fits,
+    comparative fits. Raw `.pt`, never `.rotx` (version-stamp coupling;
+    `.rotx` stays covered by `test_image_round_trip`). One mint script,
+    one loader helper, regen discipline in `development.md`,
+    `TEST_SUITE.md` updates. Done when CI is green with no live-fit
+    absolute floors outside the must-live set.
+
+23. **RoT stability across hardware (research).** The suite has proven the
+    method property behind item 22: long fits in underdetermined regimes
+    (N=31/E=768 text, 20-sample/576-ch pets) reach different minima per
+    kernel, so explanations and fidelity can wobble across machines.
+    Characterize cross-kernel variance, evaluate mitigations (early
+    stopping, stronger regularization, weight averaging, ensembles),
+    cross-referencing item 16's capacity ceilings. Success is
+    explanations/fidelity invariant across kernels; any API change needs
+    a migration note.
+
 ## New functionality
 
 16. **Optional per-location importance weights (deferred: rich backbones cover
