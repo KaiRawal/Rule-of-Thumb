@@ -15,7 +15,6 @@ and Linux/CPU runs compute the same numbers. GPU coverage lives in
 """
 
 import os
-import platform
 import random
 
 import numpy as np
@@ -25,7 +24,6 @@ import torch
 
 pytest.importorskip("sklearn")
 import joblib
-from _pet_features import compute_pet_features
 from cnn import TinyCNN
 
 ARTIFACTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "artifacts")
@@ -73,27 +71,6 @@ def tabular_multiclass():
     return {"x": data["x"], "y": data["y"], "forest": rf}
 
 
-def _pet_reference_file():
-    """Platform-specific regression anchor filename.
-
-    The 300-epoch pets fit amplifies last-ulp BLAS differences across CPU
-    architectures, so each architecture gets its own committed anchor (minted
-    with ``mint_pet_reference.py``; x86_64 via the ``mint-pet-reference``
-    workflow). ``ROT_PET_REF_ARCH`` overrides detection (testing only).
-    """
-    machine = os.environ.get("ROT_PET_REF_ARCH", platform.machine()).lower()
-    if machine in ("arm64", "aarch64"):
-        arch = "arm64"
-    elif machine in ("x86_64", "amd64"):
-        arch = "x86_64"
-    else:
-        raise RuntimeError(
-            f"no pet reference anchor for architecture {machine!r}; "
-            "mint one with tests/integration/mint_pet_reference.py"
-        )
-    return f"pet_reference_explanations.{arch}.npz"
-
-
 def _tabular_model_case(stem):
     """Committed dataset + GBM/SVC/MLP black boxes and their predictions."""
     data = np.load(_require(f"{stem}.npz"))
@@ -123,18 +100,10 @@ def pets():
 
     Only raw inputs, labels and the reference *explanations* are committed;
     MobileNet feature maps are never stored and are recomputed afresh in
-    :func:`pet_features`. The reference file is platform-specific
-    (:func:`_pet_reference_file`); same-architecture runs reproduce it
-    bit-for-bit.
+    :func:`pet_features`.
     """
     labels = pd.read_csv(_require("pets_labels.csv"))
-    try:
-        reference = np.load(_require(_pet_reference_file()))["heatmaps"]
-    except RuntimeError as e:
-        raise RuntimeError(
-            f"{e} (mint it with tests/integration/mint_pet_reference.py, "
-            "or the mint-pet-reference workflow for other architectures)"
-        ) from e
+    reference = np.load(_require("pet_reference_explanations.npz"))["heatmaps"]
     return {"labels": labels, "reference": reference, "images_dir": os.path.join(ARTIFACTS, "pet_images")}
 
 
@@ -142,9 +111,18 @@ def pets():
 def pet_features(pets):
     """Live MobileNetV3-Small feature maps ``(N, 576, 7, 7)`` for the pet set."""
     pytest.importorskip("torchvision")
+    from PIL import Image
+    from torchvision import models as tv_models
 
     labels = pets["labels"]
-    features = compute_pet_features(os.path.join(ARTIFACTS, "pet_images"), labels["filename"])
+    weights = tv_models.MobileNet_V3_Small_Weights.IMAGENET1K_V1
+    backbone = tv_models.mobilenet_v3_small(weights=weights).eval()
+    transform = weights.transforms()
+    batch = torch.stack(
+        [transform(Image.open(os.path.join(ARTIFACTS, "pet_images", name)).convert("RGB")) for name in labels["filename"]]
+    )
+    with torch.no_grad():
+        features = backbone.features(batch).numpy().astype(np.float32)
     y_gpt = labels["gpt_label"].eq("dog").to_numpy().astype(np.int64)
     ground_truth = labels["ground_truth"].eq("dog").to_numpy().astype(np.int64)
     return {"features": features, "y_gpt": y_gpt, "ground_truth": ground_truth}

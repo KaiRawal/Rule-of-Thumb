@@ -77,18 +77,8 @@
         ]
       }
     },
-    "pet_reference_explanations.arm64.npz": {
+    "pet_reference_explanations.npz": {
       "sha256": "a5748806488fbddf50824c509899845b9d54d49ec931f70a4f2406095794c379",
-      "shapes": {
-        "heatmaps": [
-          20,
-          7,
-          7
-        ]
-      }
-    },
-    "pet_reference_explanations.x86_64.npz": {
-      "sha256": "c294f32e0fda6295923583f91e98a44e0194a87265e7109c82237fb4af289fdd",
       "shapes": {
         "heatmaps": [
           20,
