@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 import torch
@@ -84,6 +86,35 @@ def test_fit_with_mask(padded_text_data):
     model = RoTText(2, (6, 4))
     model.fit(torch.from_numpy(x), y, epochs=4, batch_size=16, lr=0.01, mask=mask)
     assert len(model.training_loss) == 4
+
+
+def test_chunked_inference_matches_unchunked():
+    """Chunked paths agree with the dense path (text, masked and not)."""
+    torch.manual_seed(0)
+    x = torch.randn(5, 6, 8)
+    mask = torch.ones(5, 6, dtype=torch.bool)
+    mask[:, 4:] = False
+    model = RoTText(3, (6, 8), device="cpu")
+    with torch.no_grad():
+        for p in model.parameters():
+            p.uniform_(-1, 1)
+    kwargs = {"sample_chunk": 2, "class_chunk": 1}
+
+    for mm in (None, mask):
+        assert torch.allclose(model.score(x, mm), model.score(x, mm, **kwargs), atol=1e-5)
+        assert torch.equal(model.predict(x, mm), model.predict(x, mm, **kwargs))
+        assert np.array_equal(model.get_order(x, mm), model.get_order(x, mm, **kwargs))
+
+
+def test_large_output_warns_but_proceeds():
+    """The size guard warns (never errors), on small shapes it stays silent."""
+    from ruleofthumb.core import _warn_if_large_output
+
+    with pytest.warns(UserWarning, match="materializes"):
+        _warn_if_large_output("test", (500, 1000, 576, 4, 4))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _warn_if_large_output("test", (8, 2, 3, 4, 4))
 
 
 def test_pad_sequences_utility():

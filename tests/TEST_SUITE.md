@@ -34,17 +34,17 @@ timeout 600 .venv/bin/python -m ruff check .
 
 The suite writes only gitignored caches.
 
-## 3. Suite summary (224 tests)
+## 3. Suite summary (228 tests)
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 13 files | 160 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 13 files | 166 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 10 files | 60 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU |
 
 Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_faithfulness 3,
-test_image 17, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
-test_text 12, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, image 13, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 224.
+test_image 19, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
+test_text 14, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, image 13, nonlinear 1, persistence 4,
+plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 228.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -120,7 +120,7 @@ uses the MobileNet path (~0.99).
 
 ## 6. Runtimes (machine-specific baselines, §1 hardware)
 
-Full suite: **222 passed, warm 254.24s (0:04:14).** The session-autouse
+Full suite: **228 passed, warm 349.74s (0:05:49).** The session-autouse
 determinism fixture single-threads torch, so this run is slower than the
 previous baseline (184 passed, cold 308.81s, warm 149.79s).
 Cold≫warm gap is dominated by first-use caches (plot text/wordcloud
@@ -163,7 +163,7 @@ Slowest 5, cold run (rest match warm within ~1s):
 7.49 text native-string end-to-end,
 6.22 plot text native-string pipeline.
 
-## 7. Exhaustive test table (all 222)
+## 7. Exhaustive test table (all 228)
 
 “Pins” = structural/behavioural assertion, no numeric floor. Fit params per §3
 unless noted.
@@ -309,14 +309,15 @@ hyperparameter threading; seeding;
 device; reveal delegation; `__version__ == "0.2.19"`; removed
 `RuleOfThumb`/`TextRuleOfThumb` absent.
 
-### `tests/test_image.py` (17)
+### `tests/test_image.py` (19)
 
 Pins for `RoTImage`/paths: importance shapes; fit/score; mask zeroing;
 mixed-size batch ≡ per-sample loop; padded fit; `pad_images`; facade binary
 pipeline with untrained conv box; padded-batch mask respect; `load_images`
 native/fixed/transform paths; warning-free decoding; path routing; numpy path
 arrays route identically; path+mask rejection;
-path-on-array-fit error.
+path-on-array-fit error; chunked inference ≡ dense; 1000-class inference
+completes.
 
 ### `tests/test_masks.py` (14)
 
@@ -359,12 +360,13 @@ multiclass per-class top-1; interacting labels trip the quality wire.
 Pins for faithfulness probes on known mechanisms: tabular deletion gap;
 localized-square pointing-game; noise columns below signal.
 
-### `tests/test_text.py` (12)
+### `tests/test_text.py` (14)
 
 Pins for `RoTText`: importance shapes; mask zeroing; stochastic mask
 respect; length normalisation; fit reduces loss; masked fit; `pad_sequences`;
 multiclass masked zeros; facade multiclass reveal counts; mask-only
-`get_order` contract; tensor≡array mask agreement; seeding.
+`get_order` contract; tensor≡array mask agreement; seeding; chunked
+inference ≡ dense; large-output guard warns without erroring.
 
 ### `tests/test_tune.py` (9)
 

@@ -13,7 +13,7 @@ build the matching mask.
 import torch
 from torch import nn
 
-from ruleofthumb.core import RoT
+from ruleofthumb.core import RoT, _resolve_chunks, _warn_if_large_output
 
 
 def lengths_to_mask(lengths, max_len):
@@ -64,6 +64,47 @@ class RoTText(RoT):
         self.weights = (self.a, self.b, self.g)
         self.l1_penalty = l1_penalty
 
+    def _unit_importance(self, points, mask=None, granularity="unit", sample_chunk=None, class_chunk=None):
+        """Token-unit importances computed in sample/class chunks.
+
+        Same contract as :meth:`RoT._unit_importance`: unit granularity
+        accumulates straight into ``(N, K, T)`` via einsum so the dense
+        ``(N, K, T, E)`` tensor never materializes; element granularity
+        fills the full tensor chunk by chunk.
+        """
+        sample_chunk, class_chunk = _resolve_chunks(sample_chunk, class_chunk)
+        points = torch.as_tensor(points, device=self.device)
+        if mask is not None:
+            mask = torch.as_tensor(mask, device=self.device)
+        n, tokens = points.shape[0], points.shape[1]
+        if granularity == "unit":
+            out_shape = (n, self.classes, tokens)
+        elif granularity == "element":
+            out_shape = (n, self.classes, tokens, points.shape[2])
+        else:
+            raise ValueError(f"unknown granularity: {granularity}")
+        _warn_if_large_output("RoTText inference", out_shape)
+        out = torch.zeros(out_shape, dtype=torch.float32, device=self.device)
+        with torch.no_grad():
+            for s in range(0, n, sample_chunk):
+                resp = self._respond(points[s : s + sample_chunk])
+                mm = None if mask is None else mask[s : s + sample_chunk].to(torch.float32)
+                for k in range(0, self.classes, class_chunk):
+                    a = self.a[k : k + class_chunk]
+                    b = self.b[k : k + class_chunk]
+                    if granularity == "unit":
+                        block = torch.einsum("ke,nte->nkt", a, resp)
+                        block += (a * b).sum(1).reshape(1, -1, 1)
+                        if mm is not None:
+                            block *= mm[:, None]
+                        out[s : s + sample_chunk, k : k + class_chunk] = block
+                    else:
+                        block = a[None, :, None, :] * (resp[:, None] + b[None, :, None, :])
+                        if mm is not None:
+                            block *= mm[:, None, :, None]
+                        out[s : s + sample_chunk, k : k + class_chunk] = block
+        return out
+
     def importance(self, points, mask=None):
         points = torch.as_tensor(points, device=self.device)
         if mask is not None:
@@ -85,22 +126,21 @@ class RoTText(RoT):
             keep = keep * mask.to(keep.dtype)
         return keep[:, None, :, None] * imp
 
-    def score(self, points, mask=None):
+    def score(self, points, mask=None, *, sample_chunk=None, class_chunk=None):
         """Length-normalised class scores on the host: always CPU."""
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
-        imp = self.importance(points, mask=mask).detach()
-        response_sum = imp.sum(dim=2)
+        reduced = self._unit_importance(points, mask, "unit", sample_chunk, class_chunk).detach()
+        response_sum = reduced.sum(dim=2)
         if mask is None:
             length = torch.full(
                 response_sum.shape[:1], points.shape[1], dtype=response_sum.dtype, device=self.device
             )
         else:
             length = mask.to(response_sum.dtype).sum(1)
-        response_mean = response_sum / length.clamp(min=1)[:, None, None]
+        response_mean = response_sum / length.clamp(min=1)[:, None]
 
-        score = response_mean.reshape(response_mean.shape[0], response_mean.shape[1], -1).sum(-1)
-        score += self.g[None, :]
+        score = response_mean + self.g[None, :]
         return score.cpu()
 
     def loss(self, points, target, mask=None):

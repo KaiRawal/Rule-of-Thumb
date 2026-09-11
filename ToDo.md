@@ -39,6 +39,16 @@ are provenance notes only; the legacy code did not move with the package.
     explanations/fidelity invariant across kernels; any API change needs
     a migration note.
 
+24. **Explanation quality beyond fidelity (research).**
+    Fidelity-to-black-box and plausibility-to-human-rationales are
+    separate metrics and must be measured separately: deletion/insertion
+    curves always against random baselines, rank-agreement metrics, and
+    mandatory trivial controls (position/center priors, which beat
+    learned maps on human-agreement scores). Short or noisy inputs defeat
+    pooled representations for rare lexical signals (further evidence
+    for item 16); near-single-class black boxes need explicit handling
+    before any explanation is attempted. No implementation commitment.
+
 ## New functionality
 
 16. **Optional per-location importance weights (deferred: rich backbones cover

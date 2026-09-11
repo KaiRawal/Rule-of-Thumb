@@ -249,6 +249,41 @@ def test_numpy_path_arrays_route_to_image(png_paths):
     assert np.array_equal(exp.get_order(arr), exp.get_order(png_paths))
 
 
+def test_chunked_inference_matches_unchunked():
+    """Chunked paths agree with the dense path (image)."""
+    from ruleofthumb import Explainer
+
+    torch.manual_seed(0)
+    x = torch.randn(5, 3, 4, 4)
+    model = RoTImage(4, (3,), device="cpu")
+    with torch.no_grad():
+        for p in model.parameters():
+            p.uniform_(-1, 1)
+    kwargs = {"sample_chunk": 2, "class_chunk": 1}
+
+    assert torch.allclose(model.score(x), model.score(x, **kwargs), atol=1e-5)
+    assert torch.equal(model.predict(x), model.predict(x, **kwargs))
+    assert np.array_equal(model.get_order(x), model.get_order(x, **kwargs))
+    assert np.array_equal(
+        model.ordered_predict(x, model.get_order(x)), model.ordered_predict(x, model.get_order(x), **kwargs)
+    )
+    exp = Explainer(model, "image")
+    assert np.allclose(exp.get_explanation(x.numpy()), exp.get_explanation(x.numpy(), **kwargs), atol=1e-5)
+
+
+def test_many_class_image_inference_completes():
+    """A 1000-class image model scores without materializing (N, K, C, H, W)."""
+    torch.manual_seed(1)
+    model = RoTImage(1000, (8,), device="cpu")
+    with torch.no_grad():
+        for p in model.parameters():
+            p.uniform_(-0.5, 0.5)
+    x = torch.rand(4, 8, 4, 4)
+    assert model.score(x).shape == (4, 1000)
+    assert model.predict(x).shape == (4,)
+    assert model.get_order(x).shape == (4, 4, 4)
+
+
 def test_paths_with_explicit_mask_rejected(png_paths):
     from ruleofthumb import fit_image
 

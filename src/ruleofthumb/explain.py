@@ -168,7 +168,7 @@ class Explainer:
         images = batch.maps if hasattr(batch, "maps") else batch.images
         return torch.from_numpy(images).to(self._model.device), torch.from_numpy(batch.mask)
 
-    def get_explanation(self, x_numpy, *, mask=None) -> np.ndarray:
+    def get_explanation(self, x_numpy, *, mask=None, sample_chunk=None, class_chunk=None) -> np.ndarray:
         """Return signed importances, comparable to SHAP values.
 
         For binary tasks (``n_classes == 2``) the result holds the class-1
@@ -186,6 +186,10 @@ class Explainer:
         paths — padding is derived automatically). Build text masks from
         per-sample token counts with
         :func:`ruleofthumb.text.lengths_to_mask`.
+
+        ``sample_chunk=`` / ``class_chunk=`` bound peak memory on wide
+        inputs (many classes/channels); they default to the documented
+        constants and only affect computation chunking, not results.
         """
         resolved = self._resolve_native(x_numpy)
         if resolved is not None:
@@ -198,19 +202,19 @@ class Explainer:
         if self._modality == "tabular":
             if mask is not None:
                 raise ValueError("tabular explanations take no mask")
-            imp = self._model.importance(x)
+            imp = self._model._unit_importance(x, None, "unit", sample_chunk, class_chunk)
         elif self._modality == "text":
             if resolved is None:
                 native_mask = None if mask is None else torch.as_tensor(np.asarray(mask)).to(torch.bool)
-            imp = self._model.importance(x, mask=native_mask)
+            imp = self._model._unit_importance(x, native_mask, "unit", sample_chunk, class_chunk)
         else:
             if resolved is not None:
-                imp = self._model.importance(x, mask=native_mask)
+                imp = self._model._unit_importance(x, native_mask, "unit", sample_chunk, class_chunk)
             else:
                 if mask is not None:
                     mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
-                imp = self._model.importance(x, mask=mask)
-        imp = self._model._reduce_to_units(imp).detach().cpu().numpy()
+                imp = self._model._unit_importance(x, mask, "unit", sample_chunk, class_chunk)
+        imp = imp.detach().cpu().numpy()
         if self._model.classes == 2:
             imp = imp[:, 1]
         return imp
@@ -228,7 +232,7 @@ class Explainer:
                 kwargs["mask"] = mask
         return getattr(self._model, name)(*args, **kwargs)
 
-    def get_order(self, points, *, mask=None, granularity="unit"):
+    def get_order(self, points, *, mask=None, granularity="unit", sample_chunk=None, class_chunk=None):
         """Rank reveal units by absolute importance, most important first.
 
         See :meth:`ruleofthumb.core.RoT.get_order`. Text array inputs take a
@@ -236,12 +240,17 @@ class Explainer:
         last as ``-1``. Raw strings / file paths derive their padding
         automatically (pass no mask). ``score_ordering`` takes no mask: the
         ``-1`` entries in the returned order already encode the padding.
+        ``sample_chunk=`` / ``class_chunk=`` bound peak memory (see
+        :meth:`get_explanation`).
         """
         if self._modality == "tabular" and mask is not None:
             raise ValueError("tabular explainers take no mask")
         if self._modality == "text" and mask is not None and not _is_string_batch(points):
             mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
-        return self._delegate("get_order", (points,), {"mask": mask, "granularity": granularity})
+        return self._delegate(
+            "get_order", (points,),
+            {"mask": mask, "granularity": granularity, "sample_chunk": sample_chunk, "class_chunk": class_chunk},
+        )
 
     def ordered_predict(self, *args, **kwargs):
         """See :meth:`ruleofthumb.core.RoT.ordered_predict`. Accepts raw strings / file paths."""

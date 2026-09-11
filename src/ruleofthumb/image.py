@@ -21,7 +21,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from ruleofthumb.core import RoT
+from ruleofthumb.core import RoT, _resolve_chunks, _warn_if_large_output
 
 
 @dataclasses.dataclass(frozen=True)
@@ -138,6 +138,49 @@ class RoTImage(RoT):
         self.a = nn.Parameter(torch.zeros((classes, sample_shape[0]), requires_grad=True, device=self.device))
         self.b = nn.Parameter(torch.zeros((classes, sample_shape[0]), requires_grad=True, device=self.device))
         self.weights = (self.a, self.b, self.g)
+
+    def _unit_importance(self, points, mask=None, granularity="unit", sample_chunk=None, class_chunk=None):
+        """Pixel-unit importances computed in sample/class chunks.
+
+        The dense ``(N, K, C, H, W)`` tensor is never materialized: unit
+        granularity accumulates straight into ``(N, K, H, W)`` via einsum,
+        element granularity fills the full tensor chunk by chunk. Chunk
+        sizes default to :data:`INFERENCE_SAMPLE_CHUNK` /
+        :data:`INFERENCE_CLASS_CHUNK`; results match :meth:`importance`
+        up to summation order.
+        """
+        sample_chunk, class_chunk = _resolve_chunks(sample_chunk, class_chunk)
+        points = torch.as_tensor(points, device=self.device)
+        if mask is not None:
+            mask = torch.as_tensor(mask, device=self.device)
+        n, height, width = points.shape[0], points.shape[2], points.shape[3]
+        if granularity == "unit":
+            out_shape = (n, self.classes, height, width)
+        elif granularity == "element":
+            out_shape = (n, self.classes, points.shape[1], height, width)
+        else:
+            raise ValueError(f"unknown granularity: {granularity}")
+        _warn_if_large_output("RoTImage inference", out_shape)
+        out = torch.zeros(out_shape, dtype=torch.float32, device=self.device)
+        with torch.no_grad():
+            for s in range(0, n, sample_chunk):
+                resp = self._respond(points[s : s + sample_chunk])
+                mm = None if mask is None else mask[s : s + sample_chunk].to(torch.float32)
+                for k in range(0, self.classes, class_chunk):
+                    a = self.a[k : k + class_chunk]
+                    b = self.b[k : k + class_chunk]
+                    if granularity == "unit":
+                        block = torch.einsum("kc,nchw->nkhw", a, resp)
+                        block += (a * b).sum(1).reshape(1, -1, 1, 1)
+                        if mm is not None:
+                            block *= mm[:, None]
+                        out[s : s + sample_chunk, k : k + class_chunk] = block
+                    else:
+                        block = a[None, :, :, None, None] * (resp[:, None] + b[None, :, :, None, None])
+                        if mm is not None:
+                            block *= mm[:, None, None]
+                        out[s : s + sample_chunk, k : k + class_chunk] = block
+        return out
 
     def importance(self, points, mask=None):
         # Convolutional form.

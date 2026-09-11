@@ -78,3 +78,16 @@ result = rot.autotune(y_outputs=binary, x_inputs=images, mask=mask, seed=0)
 
 Passing labels outside `[0, n_classes)` fails fast with a `ValueError`
 naming the offending class, instead of a torch indexing error.
+
+## Fidelity vs plausibility
+
+RoT reproduces *black-box outputs*: the number to check first is always
+surrogate-vs-black-box agreement on your inputs. Agreement with *human*
+rationales (which tokens or regions people find meaningful) is a separate
+evaluation with its own baselines — always include trivial controls such
+as position or center priors, which regularly beat learned maps on
+human-agreement scores, and always compare deletion/insertion curves
+against random-mask baselines. A faithful ranking of what the model uses
+can still look nothing like what a person would highlight, especially
+where pooling discards order or location (see above) or the black box
+itself is near-degenerate. Tracked as `ToDo.md` item 24.

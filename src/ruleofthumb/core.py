@@ -5,11 +5,46 @@ Faithful port of the ``RoT`` base class from the original experiment code
 tracked in the repository-level ``ToDo.md``.
 """
 
+import warnings
+
 import numpy as np
 import torch
 from numpy import prod
 from torch import nn
 from torch.optim.swa_utils import AveragedModel
+
+#: Fixed documented chunk sizes bounding peak memory of chunked inference
+#: (Bug 13: dense ``(N, K, C, H, W)`` importance materialization OOM-kills
+#: many-class image fits). Override per call via ``sample_chunk=`` /
+#: ``class_chunk=`` on the inference entry points.
+INFERENCE_SAMPLE_CHUNK = 32
+INFERENCE_CLASS_CHUNK = 64
+
+#: Estimated output size above which chunked inference warns (never errors).
+INFERENCE_WARN_BYTES = 1 << 30
+
+
+def _resolve_chunks(sample_chunk, class_chunk):
+    """Default ``None`` chunk sizes to the documented constants."""
+    if sample_chunk is None:
+        sample_chunk = INFERENCE_SAMPLE_CHUNK
+    if class_chunk is None:
+        class_chunk = INFERENCE_CLASS_CHUNK
+    if sample_chunk < 1 or class_chunk < 1:
+        raise ValueError(f"chunk sizes must be >= 1, got {sample_chunk} and {class_chunk}")
+    return sample_chunk, class_chunk
+
+
+def _warn_if_large_output(what, shape, dtype=torch.float32):
+    """Warn (never error) when an inference output approaches OOM scale."""
+    nbytes = int(prod(shape)) * torch.tensor([], dtype=dtype).element_size()
+    if nbytes >= INFERENCE_WARN_BYTES:
+        warnings.warn(
+            f"{what} materializes ~{nbytes / 2**30:.1f} GiB for shape {tuple(shape)}; "
+            "computation is chunked but the output itself is that large. "
+            "Consider fewer samples or, for many-class heads, a binary-vs-rest "
+            "label remap (see the capacity docs)."
+        )
 
 
 def _resolve_device(device=None):
@@ -191,16 +226,16 @@ class RoT(torch.nn.Module):
     def averaged_explainer(self):
         return list(self.swa_model.children())[0]  # noqa: RUF015 (kept verbatim from source)
 
-    def score(self, points, mask=None):
+    def score(self, points, mask=None, *, sample_chunk=None, class_chunk=None):
         """Class scores on the host: the returned tensor is always CPU."""
-        imp = self.importance(points, mask=mask).detach()
+        imp = self._unit_importance(points, mask, "unit", sample_chunk, class_chunk).detach()
         score = imp.reshape(imp.shape[0], imp.shape[1], -1).sum(-1)
         score += self.g[None, :]
         return score.cpu()
 
-    def predict(self, points, mask=None):
+    def predict(self, points, mask=None, *, sample_chunk=None, class_chunk=None):
         """Predicted classes on the host: the returned tensor is always CPU."""
-        score = self.score(points, mask=mask)
+        score = self.score(points, mask, sample_chunk=sample_chunk, class_chunk=class_chunk)
         return score.argmax(1)
 
     def _reduce_to_units(self, imp):
@@ -213,7 +248,27 @@ class RoT(torch.nn.Module):
         """
         return imp
 
-    def ordered_predict(self, points, order, include_padded=False, granularity="unit"):
+    def _unit_importance(self, points, mask=None, granularity="unit", sample_chunk=None, class_chunk=None):
+        """Reveal-unit importances with bounded peak memory.
+
+        ``granularity="unit"`` (default) returns reduced units
+        ``(N, classes, *unit_shape)``; ``"element"`` returns per-element
+        importances. Modalities with wide shared dimensions (images, text)
+        override this to compute in sample/class chunks instead of
+        materializing the full ``(N, K, C, ...)`` tensor; the default
+        implementation calls :meth:`importance` directly, which is exact
+        for narrow inputs. Chunk sizes default to
+        :data:`INFERENCE_SAMPLE_CHUNK` / :data:`INFERENCE_CLASS_CHUNK`.
+        """
+        _resolve_chunks(sample_chunk, class_chunk)
+        imp = self.importance(points, mask=mask)
+        if granularity == "unit":
+            imp = self._reduce_to_units(imp)
+        elif granularity != "element":
+            raise ValueError(f"unknown granularity: {granularity}")
+        return imp
+
+    def ordered_predict(self, points, order, include_padded=False, granularity="unit", *, sample_chunk=None, class_chunk=None):
         """Predict after revealing units best-first according to ``order``.
 
         ``granularity`` must match how ``order`` was produced by
@@ -231,12 +286,8 @@ class RoT(torch.nn.Module):
         The returned predictions live on the host (always CPU) regardless of
         the model's device.
         """
-        imp = self.importance(points).detach()
+        imp = self._unit_importance(points, None, granularity, sample_chunk, class_chunk).detach()
         n = imp.shape[0]
-        if granularity == "unit":
-            imp = self._reduce_to_units(imp)
-        elif granularity != "element":
-            raise ValueError(f"unknown granularity: {granularity!r}")
         positions = int(prod(imp.shape[2:]))
 
         flat_imp = imp.reshape(n, self.classes, positions).permute(0, 2, 1)
@@ -274,7 +325,7 @@ class RoT(torch.nn.Module):
             pred[torch.from_numpy(exhausted).to(self.device)] = -1
         return pred.cpu()
 
-    def get_order(self, points, mask=None, granularity="unit"):
+    def get_order(self, points, mask=None, granularity="unit", *, sample_chunk=None, class_chunk=None):
         """Rank reveal units by absolute importance, most important first.
 
         With ``granularity="unit"`` (default) one unit is a token (text),
@@ -291,11 +342,7 @@ class RoT(torch.nn.Module):
 
         Ranking happens on the host: the returned order is a numpy array.
         """
-        imp = self.importance(points, mask=mask).detach().cpu()
-        if granularity == "unit":
-            imp = self._reduce_to_units(imp)
-        elif granularity != "element":
-            raise ValueError(f"unknown granularity: {granularity!r}")
+        imp = self._unit_importance(points, mask, granularity, sample_chunk, class_chunk).detach().cpu()
         imp = np.abs(imp.numpy()).sum(1)  # abs-sum over classes: n x *unit_shape
         old_shape = imp.shape
         imp = imp.reshape(imp.shape[0], -1)
@@ -319,7 +366,8 @@ class RoT(torch.nn.Module):
         return order.reshape(old_shape)
 
     def score_ordering(
-        self, points, labels, order, metric=None, include_padded=False, granularity="unit", return_confusion=False
+        self, points, labels, order, metric=None, include_padded=False, granularity="unit", return_confusion=False,
+        *, sample_chunk=None, class_chunk=None,
     ):
         """Fidelity at each incremental-reveal step.
 
@@ -354,7 +402,10 @@ class RoT(torch.nn.Module):
                 "score_ordering(points, labels, order): points, labels and order must cover "
                 f"the same number of samples, got {n_points}, {label_arr.shape[0]} and {n_order}"
             )
-        pred = self.ordered_predict(points, order, include_padded=include_padded, granularity=granularity).cpu()
+        pred = self.ordered_predict(
+            points, order, include_padded=include_padded, granularity=granularity,
+            sample_chunk=sample_chunk, class_chunk=class_chunk,
+        ).cpu()
         labels = torch.as_tensor(labels).cpu()
         valid = pred != -1
         active = valid.any(0)
