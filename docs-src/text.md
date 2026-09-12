@@ -65,6 +65,10 @@ order was produced. Details: {ref}`Workflows: reveal curves <reveal-curves>`.
 The executed hello-world is
 `notebooks/02_text_quickstart.ipynb` (generated copy of
 `examples/02_text_quickstart.ipynb`, re-executed on every site build).
+The human-annotation benchmark is
+`notebooks/04_hatexplain.ipynb` (generated copy of
+`examples/04_hatexplain.ipynb`): HateXPlain rationales, faithfulness
+curves and bias slices.
 
 ## Next steps
 

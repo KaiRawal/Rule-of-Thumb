@@ -93,6 +93,10 @@ padded pixels reported as `-1` in place. Count a sample's padding with
 The executed hello-world is
 `notebooks/03_image_quickstart.ipynb` (generated copy of
 `examples/03_image_quickstart.ipynb`, re-executed on every site build).
+The human-annotation benchmark is
+`notebooks/05_salicon.ipynb` (generated copy of
+`examples/05_salicon.ipynb`): MIT1003 fixation boxes, IG/occlusion
+baselines and a contact sheet.
 
 ## Next steps
 

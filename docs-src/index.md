@@ -112,6 +112,8 @@ quickstart
 notebooks/01_tabular_quickstart
 notebooks/02_text_quickstart
 notebooks/03_image_quickstart
+notebooks/04_hatexplain
+notebooks/05_salicon
 ```
 
 ```{toctree}
