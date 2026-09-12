@@ -385,6 +385,166 @@ def write_reviews(manifest):
     print(f"reviews: {len(REVIEWS)} fixed snippets")
 
 
+CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "external_cache")
+
+
+def _require_cache(name):
+    path = os.path.join(CACHE, name)
+    if not os.path.exists(path):
+        raise RuntimeError(
+            f"missing cache file {path}; populate it with "
+            "tests/integration/fetch_external.py (CI runs it as a setup step)"
+        )
+    return path
+
+
+def make_hx(manifest):
+    """HateXPlain text benchmark: committed RoT weights + eval indices + refs.
+
+    Reads ``external_cache/`` (see fetch_external.py). Fits the winning
+    spike configuration: 3000-post rng(0) train slice, ModernBERT
+    embeddings, ``fit_text`` 300 epochs / batch 256 / lr 0.01 / seed 0.
+    Saves raw state dicts (no version-stamped bundles) plus the constructor
+    specs needed to rebuild the explainers at test time.
+    """
+    import ruleofthumb
+    from ruleofthumb import fit_text
+    from ruleofthumb.text import RoTText
+
+    with open(_require_cache("hx_full.json")) as f:
+        full = json.load(f)
+    ybb_tr = np.load(_require_cache("hx_ybb_train.npy"))
+    rng = np.random.RandomState(0)
+    take = rng.choice(len(full["train"]["texts"]), 3000, replace=False)
+    take.sort()
+    texts = [full["train"]["texts"][i] for i in take]
+    emb = ruleofthumb.embed_texts(texts, max_length=96)
+    exp = fit_text(
+        ybb_tr[take], emb.embeddings, mask=emb.attention_mask,
+        epochs=300, batch_size=256, learning_rate=0.01, seed=0,
+    )
+    torch.save(exp._model.state_dict(), os.path.join(ARTIFACTS, "hx_rot_text.pt"))
+    spec = {
+        "modality": "text",
+        "cls": "RoTText",
+        "n_classes": 2,
+        "sample_shape": [int(emb.embeddings.shape[1]), int(emb.embeddings.shape[2])],
+        "train_idx": [int(i) for i in take],
+        "modernbert_revision": ruleofthumb.DEFAULT_TEXT_REVISION,
+    }
+    with open(os.path.join(ARTIFACTS, "hx_rot_spec.json"), "w") as f:
+        json.dump(spec, f)
+    check = RoTText(2, tuple(spec["sample_shape"]))
+    check.load_state_dict(torch.load(os.path.join(ARTIFACTS, "hx_rot_text.pt"), map_location="cpu", weights_only=True))
+
+    ev = rng.choice(len(full["test"]["texts"]), 150, replace=False)
+    ev.sort()
+    np.save(os.path.join(ARTIFACTS, "hx_eval_idx.npy"), ev)
+
+    box = joblib.load(_require_cache("hx_box.joblib"))
+    Xev = box["vec"].transform([full["test"]["texts"][i] for i in ev])
+    import shap
+
+    masker = shap.maskers.Independent(box["vec"].transform(full["train"]["texts"][:1000]), max_samples=100)
+    sv = shap.LinearExplainer(box["bb"], masker).shap_values(Xev.toarray())
+    np.save(os.path.join(ARTIFACTS, "hx_shap_eval.npy"), np.asarray(sv, dtype=np.float32))
+    refs = {
+        "bb_test_accuracy": float(np.mean(np.load(_require_cache("hx_ybb_test.npy")) == np.array(full["test"]["y"]))),
+        "eval_idx": [int(i) for i in ev],
+        "n_eval": len(ev),
+    }
+    with open(os.path.join(ARTIFACTS, "hx_refs.json"), "w") as f:
+        json.dump(refs, f, indent=2)
+    record(manifest, "hx_rot_text.pt")
+    record(manifest, "hx_rot_spec.json")
+    record(manifest, "hx_eval_idx.npy", {"idx": ev})
+    record(manifest, "hx_shap_eval.npy", {"sv": np.asarray(sv, dtype=np.float32)})
+    record(manifest, "hx_refs.json")
+    print("hx artifacts written", flush=True)
+
+
+def make_sal(manifest):
+    """MIT1003 image benchmark: committed RoT weights + preds + refs.
+
+    Reads ``external_cache/``. Fits the winning spike configuration:
+    MobileNetV3-Small maps, full 500-set, 60 epochs / batch 64 / seed 0
+    (``n_classes=1000``), plus the 150-subset raw-pixel arm (60 epochs).
+    Also computes IG + occlusion maps for a fixed 20-subset (uint8) used by
+    the notebook overlays and the box-metric cross-checks.
+    """
+    from ruleofthumb import fit_image
+    from ruleofthumb.image import RoTImage
+
+    X = np.load(_require_cache("sal_X.npy"))
+    P = np.load(_require_cache("sal_P.npy")).astype(np.int64)
+    Fm = np.load(_require_cache("sal_mob.npy"))
+    idx = np.load(_require_cache("sal_sub_idx.npy"))
+
+    mob = fit_image(P, Fm.astype(np.float32), epochs=60, batch_size=64, n_classes=1000, seed=0)
+    torch.save(mob._model.state_dict(), os.path.join(ARTIFACTS, "sal_rot_mob.pt"))
+    with open(os.path.join(ARTIFACTS, "sal_rot_mob_spec.json"), "w") as f:
+        json.dump({"modality": "image", "cls": "RoTImage", "n_classes": 1000,
+                   "sample_shape": [int(Fm.shape[1])]}, f)
+    check = RoTImage(1000, (int(Fm.shape[1]),))
+    check.load_state_dict(torch.load(os.path.join(ARTIFACTS, "sal_rot_mob.pt"), map_location="cpu", weights_only=True))
+
+    from PIL import Image as PILImage
+
+    Xp = np.stack(
+        [np.array(PILImage.fromarray(X[j]).resize((32, 32))).transpose(2, 0, 1) for j in idx]
+    ).astype(np.float32) / 255.0
+    pix = fit_image(P[idx], Xp, epochs=60, batch_size=32, n_classes=1000, seed=0)
+    torch.save(pix._model.state_dict(), os.path.join(ARTIFACTS, "sal_rot_pix.pt"))
+    with open(os.path.join(ARTIFACTS, "sal_rot_pix_spec.json"), "w") as f:
+        json.dump({"modality": "image", "cls": "RoTImage", "n_classes": 1000, "sample_shape": [3]}, f)
+
+    np.save(os.path.join(ARTIFACTS, "sal_P.npy"), P)
+    np.save(os.path.join(ARTIFACTS, "sal_sub_idx.npy"), idx)
+
+    import captum  # noqa: F401 (hard test-time-free dependency, used here at mint time)
+    from captum.attr import IntegratedGradients, Occlusion
+    from torchvision.models import ResNet18_Weights, resnet18
+
+    sub = np.random.RandomState(0).choice(len(idx), 20, replace=False)
+    gi = idx[sub]
+    with open(os.path.join(ARTIFACTS, "sal_ig_idx.json"), "w") as f:
+        json.dump([int(i) for i in gi], f)
+    bb = resnet18(weights=ResNet18_Weights.DEFAULT).eval()
+    xb = torch.from_numpy(X[gi].transpose(0, 3, 1, 2).astype(np.float32) / 255.0)
+    tgt = torch.from_numpy(P[gi].astype(int))
+    ig = IntegratedGradients(bb)
+    igm = np.stack([
+        ig.attribute(xb[j : j + 1], target=int(tgt[j]),
+                     baselines=torch.zeros_like(xb[j : j + 1]),
+                     n_steps=20)[0].detach().abs().sum(0).numpy()
+        for j in range(20)
+    ])
+    occ = Occlusion(bb)
+    ocm = np.stack([
+        occ.attribute(xb[j : j + 1], target=int(tgt[j]), strides=(3, 16, 16),
+                      sliding_window_shapes=(3, 16, 16), baselines=0.0)[0].detach().abs().sum(0).numpy()
+        for j in range(20)
+    ])
+
+    def q8(a):
+        a = a.astype(np.float64)
+        lo, hi = a.min(), a.max()
+        return (((a - lo) / (hi - lo + 1e-12) * 255).astype(np.uint8), float(lo), float(hi))
+
+    igq, iglo, ighi = q8(igm)
+    ocq, oclo, ochi = q8(ocm)
+    np.savez_compressed(os.path.join(ARTIFACTS, "sal_base20.npz"), ig=igq, occ=ocq,
+                        idx=np.asarray(sub))
+    with open(os.path.join(ARTIFACTS, "sal_refs.json"), "w") as f:
+        json.dump({"ig_scale": [iglo, ighi], "occ_scale": [oclo, ochi],
+                   "bb_spread": len(np.unique(P))}, f, indent=2)
+    for name in ("sal_rot_mob.pt", "sal_rot_mob_spec.json", "sal_rot_pix.pt",
+                 "sal_rot_pix_spec.json", "sal_P.npy", "sal_sub_idx.npy",
+                 "sal_ig_idx.json", "sal_base20.npz", "sal_refs.json"):
+        record(manifest, name)
+    print("sal artifacts written", flush=True)
+
+
 def main():
     os.makedirs(ARTIFACTS, exist_ok=True)
     manifest = {
@@ -409,6 +569,8 @@ def main():
     make_pets(manifest)
     make_compas(manifest)
     make_wine(manifest)
+    make_hx(manifest)
+    make_sal(manifest)
 
     path = os.path.join(ARTIFACTS, "manifest.json")
     with open(path, "w") as f:

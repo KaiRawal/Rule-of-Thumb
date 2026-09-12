@@ -48,6 +48,12 @@ are provenance notes only; the legacy code did not move with the package.
     pooled representations for rare lexical signals (further evidence
     for item 16); near-single-class black boxes need explicit handling
     before any explanation is attempted. No implementation commitment.
+25. **Center-prior comparison for image agreement (research).**
+    Human-agreement scores for saliency are dominated by position priors
+    (a static center control beats learned maps). The fidelity gate and
+    any saliency-as-detector guidance should require beating a center
+    control by margin, or the docs must state plainly that saliency is
+    not gaze prediction. No implementation commitment.
 
 ## New functionality
 

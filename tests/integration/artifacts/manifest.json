@@ -96,6 +96,33 @@
     "reviews.txt": {
       "sha256": "8c6ffd6dd021e793fec76b6f7ca5ef0b53ca3ac4be03a5ae5ddd5c4f3c0ff97b"
     },
+    "sal_P.npy": {
+      "sha256": "ad7e52f3c169adbb3605e3b3b27e38a2faa9a9833445c036576188e66acfa54a"
+    },
+    "sal_base20.npz": {
+      "sha256": "a15951ba8ea67a4723bec8b8fb660c45f636cfb10c007fe1e2921af77f484b3a"
+    },
+    "sal_ig_idx.json": {
+      "sha256": "ea54b5e6cd7c0d5e838addb98ba21fc9bbe6fc3cace1880f816071d6141dc005"
+    },
+    "sal_refs.json": {
+      "sha256": "b85eab35f552be85a2b9e39693d838acac3ee4ea32b8ab91b96f0171c51d33b2"
+    },
+    "sal_rot_mob.pt": {
+      "sha256": "401dc05e2a3f89d81ed4df7bc41b897c4026fc7867e241bf2388983a90522ce6"
+    },
+    "sal_rot_mob_spec.json": {
+      "sha256": "1bf43767692a9194f00355f97fac76a7ea746232fa7be48564cf4b1e966fb661"
+    },
+    "sal_rot_pix.pt": {
+      "sha256": "eefdad012ee1545dfbed3e3082f09066aae5fcc3fdb68fbde9a2ec5fe30d0179"
+    },
+    "sal_rot_pix_spec.json": {
+      "sha256": "f9160c343d411c0d301cfc97cc6f6162fcde853875c6c747acef38a2161de319"
+    },
+    "sal_sub_idx.npy": {
+      "sha256": "d8ce8442b0b39531d39dbdc90aaf698bd76f9d14530f40e173334445cc73e6b3"
+    },
     "tabular_binary.npz": {
       "sha256": "af9b02db6e20d09dae2228d51b6e56d8d3fbcc9c402a13648dde7995b64d2432",
       "shapes": {

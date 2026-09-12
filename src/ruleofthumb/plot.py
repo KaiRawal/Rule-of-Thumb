@@ -227,7 +227,13 @@ def saliency(
     """
     if power <= 0:
         raise ValueError("power must be positive")
-    heat = np.sign(np.asarray(heatmap, dtype=np.float32)) * np.power(np.abs(np.asarray(heatmap, dtype=np.float32)), power)
+    heat = np.asarray(heatmap)
+    if heat.ndim != 2:
+        raise ValueError(
+            f"saliency expects a single (H, W) map, got shape {heat.shape}; "
+            "did you forget the sample/class index?"
+        )
+    heat = np.sign(heat.astype(np.float32)) * np.power(np.abs(heat.astype(np.float32)), power)
     low, high = np.percentile(heat, trim), np.percentile(heat, 100 - trim)
     positive = np.clip(heat / (high if high > 0 else 1e-8), 0.0, 1.0)
     negative = np.clip(-heat / (-low if low < 0 else 1e-8), 0.0, 1.0)

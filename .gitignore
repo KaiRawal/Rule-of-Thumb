@@ -16,6 +16,8 @@ __pycache__/
 .readthedocs_api_key
 # staged notebook copies (generated; see PUBLISH.md one-command docs build)
 docs-src/notebooks/
+# external human-annotation data (gitignored cache; see fetch_external.py)
+tests/integration/external_cache/
 # sphinx build output + notebook execution cache (never committed; RTD builds its own)
 docs-src/_build/
 .jupyter_cache/

@@ -34,17 +34,17 @@ timeout 600 .venv/bin/python -m ruff check .
 
 The suite writes only gitignored caches.
 
-## 3. Suite summary (228 tests)
+## 3. Suite summary (240 tests)
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
 | Unit `tests/test_*.py` | 13 files | 166 | Synthetic tensors/arrays, no artifacts |
-| Integration `tests/integration/` | 10 files | 60 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU |
+| Integration `tests/integration/` | 12 files | 72 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU (HX/Salicon weights committed, rebuilt without refit) |
 
 Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_faithfulness 3,
 test_image 19, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
-test_text 14, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, image 13, nonlinear 1, persistence 4,
-plot 7, tabular 6, tabular_models 11, text 10, tune 3. Total 228.
+test_text 14, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, hx 6, image 13, nonlinear 1, persistence 4,
+plot 7, sal 6, tabular 6, tabular_models 11, text 10, tune 3. Total 240.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -74,15 +74,32 @@ ingestion uses `epochs=50`: shorter fits resist cross-host amplification).
 | `pet_images/` | 700K | 20 raw cat/dog JPEGs (10/class) |
 | `pet_reference_explanations.npz` | 4K | `heatmaps` (20,7,7) regression anchors (forward pass of `pet_rot_state.pt`) |
 | `pet_rot_state.pt` | 12K | Fitted `RoTImage` state dict for the pets fit (raw weights, not `.rotx`; minted via `mint_pet_weights.py`) |
+| `hx_rot_text.pt` / `hx_rot_spec.json` | 16K / 20K | Fitted `RoTText` state dict (3000-post slice, ModernBERT, 300ep) + rebuild spec; cache texts/labels live in `external_cache/` (gitignored) |
+| `hx_eval_idx.npy` | 4K | 150 eval indices into the HX test set (rng 0) |
+| `hx_shap_eval.npy` | 4.8M | Exact-SHAP values for the 150 eval posts (TF-IDF box parity reference) |
+| `hx_refs.json` | 4K | Black-box test accuracy + eval bookkeeping |
+| `sal_rot_mob.pt` / `sal_rot_mob_spec.json` | 4.6M / 4K | Fitted 1000-way `RoTImage` state dict (full 500-set maps, 60ep) + rebuild spec |
+| `sal_rot_pix.pt` / `sal_rot_pix_spec.json` | 32K / 4K | Fitted 1000-way `RoTImage` state dict (150-subset pixels, 60ep) + rebuild spec |
+| `sal_P.npy` / `sal_sub_idx.npy` / `sal_ig_idx.json` | 4K / 4K / 4K | ResNet18 predictions, 150-subset indices, 20-subset indices |
+| `sal_base20.npz` | 132K | uint8 IG + occlusion maps for the 20-subset (+ scales in `sal_refs.json`) |
 | `manifest.json` | 4K | sha256 + shapes provenance, env versions |
+
+External cache (gitignored, never committed; `fetch_external.py`, CI setup
+step): HX JSONs + TF-IDF/logreg box + BB labels, MIT1003 500-set + ResNet
+predictions + MobileNet features. Tests skip cleanly without it.
 
 ### 4b. Computed live at test time (never committed)
 
 - MobileNetV3-Small `IMAGENET1K_V1` feature maps: pets `(20,576,7,7)`,
-  digits-rich `(500,576,7,7)` (torchvision weights from local cache).
+  digits-rich `(500,576,7,7)`, salicon-150 `(150,576,4,4)` (torchvision
+  weights from local cache).
 - distilbert-SST-2 revision `714eb0f` embeddings/logits for `reviews.txt`
-  (HF cache); ModernBERT revision `8949b90` for native-string tests.
-- Every RoT explainer under test (only model ever fitted at test time).
+  (HF cache); ModernBERT revision `8949b90` for native-string tests; HX
+  eval-slice (150 posts) and full-test (1924 posts) ModernBERT embeddings
+  recomputed live per session from the external cache.
+- Every RoT explainer under test (only model ever fitted at test time)
+  except the HX/Salicon benchmarks, whose committed weights are rebuilt
+  from state dicts (no refit).
 
 ### 4c. Written only by `tests/integration/generate_artifacts.py`
 
@@ -108,6 +125,8 @@ the tests assert floors on. **Majority** = always-guess-commonest-class score.
 | image 10-class coords C=3 | 500 | n/a (CNN outputs) | 0.3240 (maj 0.104) | `>=maj+0.15` (~0.35) and `>=raw+0.15` |
 | image 10-class MobileNet rich | 500 | n/a (CNN outputs) | 0.9940 (maj 0.104) | `>=0.8`, `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
 | pets GPT-vs-truth / RoT-vs-GPT | 20 | 1.0000 | 1.0000 (floor `>=0.85`; heatmap corr min `>=0.95`, mean `>=0.99`; dog-mass corr `>=0.9`) | as listed |
+| HX TF-IDF/logreg box, RoT-text | 1924 | 0.7588 | 0.7646 | `>=0.72`; wAUROC 0.7056 (`>=0.65`); SHAP parity ±0.08; deletion wins +0.02 and insertion wins at k=3,10 (n=200); target slices smoke |
+| MIT1003 ResNet18, RoT-maps/pixel | 150 | n/a (API outputs) | maps 0.9533 / pixel 0.1867 | maps `>=0.90`, pixel `<=0.30` (documented collapse); pointing mob 0.34 `>=0.28`, mob > pixel, rand `<=0.15`; box-IoU mob > pixel; IG `>=0.20` / occlusion `>=0.15` (20-subset refs) |
 | text SST-2 (2-class, min conf 0.9953) | reviews | n/a (logits are labels) | 1.0000 | full-curve `>=0.85`, native-string `>=0.8`, sentiment-word hit rates |
 | nonlinear wine rbf vs linear | 178 | n/a | shaped 1.0000 vs linear 0.9944 | shaped `>=0.85`, `>=linear-0.02` |
 | tune tabular best/refit | 569 | — | 0.9789 / 0.9895 | `>=0.9` / `>=0.9` |
@@ -163,7 +182,7 @@ Slowest 5, cold run (rest match warm within ~1s):
 7.49 text native-string end-to-end,
 6.22 plot text native-string pipeline.
 
-## 7. Exhaustive test table (all 228)
+## 7. Exhaustive test table (all 240)
 
 “Pins” = structural/behavioural assertion, no numeric floor. Fit params per §3
 unless noted.
@@ -184,6 +203,17 @@ unless noted.
 | `test_rot_surrogate_accuracy_against_gpt_labels` | RoT-vs-GPT `>=0.85` (measured 1.0) |
 | `test_heatmaps_match_reference_explanations` | Committed weights (no training) reproduce the reference: loaded accuracy 1.0; shape (20,7,7); corr min `>=0.95`, mean `>=0.99`; both signs present |
 | `test_dog_images_highlight_the_dog_direction` | Mean dog-mass dogs>cats; corr(dog-mass, labels) `>=0.9` |
+
+### `tests/integration/test_hx.py` (6)
+
+| Test | Checks |
+| --- | --- |
+| `test_hx_fidelity` | Committed text weights (no training) vs BB on full test `>=0.72` (measured 0.7646) |
+| `test_hx_wauroc_beats_random` | Word-level weighted AUROC vs rationales `>=0.65` (measured 0.7056, n=1098; random ~0.49) |
+| `test_hx_shap_parity` | RoT wAUROC within 0.08 of exact-SHAP wAUROC on the 150 eval slice |
+| `test_hx_faithfulness` | Deletion wins by `>=0.02` and insertion wins vs random at k=3,10 (n=200, signed insertion) |
+| `test_hx_target_slices` | Fidelity defined per target group (`>=3` groups with n`>=10`) |
+| `test_hx_renders` | `text_html` + `text_matplotlib` render an eval post |
 
 ### `tests/integration/test_image_integration.py` (13)
 
@@ -229,6 +259,17 @@ unless noted.
 | `test_multiclass_tabular_plots_per_class` | Per-class tabular plots |
 | `test_image_saliency_from_fitted_explainer` | Saliency from fitted image explainer |
 | `test_text_native_string_pipeline_and_matplotlib_export` | String→embed→explain→plot pipeline |
+
+### `tests/integration/test_sal.py` (6)
+
+| Test | Checks |
+| --- | --- |
+| `test_sal_mob_fidelity` | Committed maps weights (no training) vs ResNet on 150-subset `>=0.90` (measured 0.9533) |
+| `test_sal_pixel_collapse_documented` | Pixel arm `<=0.30` (measured 0.1867; earns the capacity ceiling) |
+| `test_sal_pointing_order` | Pointing: mob `>=0.28` (measured 0.34), mob > pixel, random `<=0.15` |
+| `test_sal_box_iou_order` | Box P-IoU mob > pixel (measured 0.197 vs 0.078) |
+| `test_sal_ig_occ_refs` | Committed 20-subset IG/occlusion maps: shapes, uint8, pointing `>=0.20` / `>=0.15` |
+| `test_sal_renders` | Sliced `saliency` overlay renders; unsliced multiclass call raises the class-index hint |
 
 ### `tests/integration/test_tabular_integration.py` (6)
 
