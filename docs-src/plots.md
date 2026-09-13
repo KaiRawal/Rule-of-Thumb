@@ -1,13 +1,17 @@
 # Plots
 
-`ruleofthumb.plot` draws every modality. One convention everywhere:
-**red pushes toward the predicted answer, blue pushes away.** Every
-function returns a matplotlib `Figure` and never shows it — save or
-display it yourself.
+`ruleofthumb.plot` draws explanations for every modality. One
+convention runs through all of it: **red pushes toward the predicted
+answer, blue pushes away.** Every function hands you a matplotlib
+`Figure` and deliberately never displays it — saving, showing, and
+embedding stay your decision.
 
-## Tables
+## Tables, drawn two ways
 
-SHAP-style plots for one answer or a batch (needs the `[plot]` extra):
+The tabular plots speak SHAP's visual language on purpose, so anyone
+arriving from that world feels at home (they need the `[plot]`
+extra). Waterfall, force, and decision each unpack a single answer;
+bar and beeswarm summarise a batch:
 
 ```python
 plot.waterfall(exp, X[:1], feature_names=names)  # one answer, stacked
@@ -27,7 +31,11 @@ plot.beeswarm(exp, X[:50], feature_names=names)  # batch vs values
 :alt: Bar chart of per-column importances
 ```
 
-## Words
+## Words, highlighted and gathered
+
+Token explanations want to be read in place — the sentence itself,
+with the telling words glowing — and occasionally gathered across a
+whole corpus:
 
 ```python
 plot.text_html(imp[0], tokens[0])       # notebook highlight
@@ -45,7 +53,12 @@ plot.word_clouds(imp, all_tokens)       # toward / against / combined
 :alt: Sentence with the important word highlighted
 ```
 
-## Pixels
+## Pixels, overlaid where they belong
+
+A saliency map means most with its picture underneath it, so
+`plot.saliency` layers the signed importances over the image itself
+(the bare image argument is optional, for when the map alone says
+enough):
 
 ```python
 plot.saliency(imp[0], image=rgb)  # overlay; image optional
@@ -61,13 +74,16 @@ plot.saliency(imp[0], image=rgb)  # overlay; image optional
 :alt: Saliency overlay highlighting the circle
 ```
 
-## Reveal curves
+## Curves that prove the ranking
 
 ```python
 plot.reveal({"RoT order": good, "Random": baseline})
 ```
 
-One value per reveal step per curve (the outputs of `score_ordering`).
-See [Reveal curves](reveal.md).
+Each curve is one value per reveal step — the outputs of
+`score_ordering` — drawn so the learned order can be judged against
+chance at a glance. See [Checking the ranking by revealing
+less](reveal.md).
 
-All calls above appear runnable in [Examples](examples.md).
+Every call on this page appears in runnable form under
+[Examples](examples.md).

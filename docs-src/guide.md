@@ -1,21 +1,23 @@
 # Guide
 
-Read top to bottom, or jump to your data type. Unfamiliar words are
-defined in [Core ideas](concepts.md).
+This is the working heart of the documentation: read it top to
+bottom for the full picture, or jump straight to your kind of data.
+Any unfamiliar words are defined over in [Core ideas](concepts.md).
 
-| Page | Answers |
+| Page | What it gives you |
 |---|---|
-| [Tabular](tabular.md) | Columns and rows: shapes, meanings, multiclass |
-| [Text](text.md) | Sentences: raw strings first, arrays and masks second |
-| [Images](image.md) | Pictures: file paths first, arrays and backbones second |
-| [Reveal curves](reveal.md) | The payoff: rank, uncover, re-check |
-| [Plots](plots.md) | The gallery: every visualisation with its call |
-| [Tuning and saving](workflows.md) | Better fits (`autotune`) and keeping them (`save`/`load`) |
-| [Limits](capacity.md) | What the stand-in cannot see — read before trusting |
+| [Tabular](tabular.md) | Columns and rows: the shapes you get back, what the signs mean, and how multiple answers work |
+| [Text](text.md) | Sentences: start from raw strings, reach for arrays and masks when you need control |
+| [Images](image.md) | Pictures: start from file paths, reach for arrays and backbones when you need control |
+| [Reveal curves](reveal.md) | Checking a ranking by revealing less: rank, uncover, re-check |
+| [Plots](plots.md) | The gallery: every visualisation alongside the call that makes it |
+| [Tuning and saving](workflows.md) | Better fits with `autotune`, and keeping them with `save` and `load` |
+| [Limits](capacity.md) | What the stand-in cannot see — worth reading before you trust an explanation |
 
-The runnable companions live under [Examples](examples.md): three
-hello-worlds plus the [Shapes demo](notebooks/06_shapes_demo.ipynb),
-all on dummy data in seconds.
+Prefer learning by running code? The companions under
+[Examples](examples.md) — three hello-worlds plus the
+[Shapes demo](notebooks/06_shapes_demo.ipynb) — all run on dummy data
+in a matter of seconds.
 
 ```{toctree}
 :hidden:

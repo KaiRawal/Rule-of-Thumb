@@ -1,9 +1,11 @@
 # Tabular
 
-Tables of numbers: `X` is `[rows, columns]`, `y` is one integer answer
-per row. One importance number per column.
+Tables of numbers are the gentlest place to begin: `X` holds
+`[rows, columns]`, `y` holds one integer answer per row, and you get
+back one importance number per column — no masks, no padding, no
+embeddings to think about.
 
-## Try it
+## Seeing it on a small table
 
 ```python
 import numpy as np
@@ -16,19 +18,22 @@ exp = rot.fit_tabular(y_answers, X, epochs=30, seed=0)
 imp = exp.get_explanation(X)  # [1000, 4], signed
 ```
 
-`fit` with a 2-D input does the same thing (it detects tables
-automatically); `fit_tabular` says it explicitly.
+Calling `fit` with a 2-D input does exactly the same thing — it
+recognises a table automatically — while `fit_tabular` states your
+intention out loud. Either is fine; pick the one that reads better
+in your code.
 
-## Shapes and meanings
+## What the shapes mean
 
-- Binary (two answers): `get_explanation` returns `[N, D]` — the
-  contributions toward answer 1. Positive pushes toward 1, negative
-  toward 0.
-- More answers (`n_classes=`): returns `[N, K, D]` — one set per
-  answer, never collapsed.
-- Tabular takes no mask: every cell is real data.
+- With two possible answers, `get_explanation` returns `[N, D]`:
+  each row's contributions toward answer 1. Positive values pushed
+  toward 1, negative ones toward 0.
+- With more answers (`n_classes=`), you get `[N, K, D]` instead — a
+  full set of contributions per answer, never collapsed into one.
+- Tables take no mask at all: every cell is genuine data, so there is
+  nothing to mark as filler.
 
-## Rank, reveal, draw
+## From numbers to a ranking you can check
 
 ```python
 order = exp.get_order(X_torch)                    # [N, D], best first
@@ -37,12 +42,15 @@ fig = plot.waterfall(exp, X[:1], feature_names=names)  # one answer
 fig = plot.bar(exp, X[:50], feature_names=names)       # whole batch
 ```
 
-Details: [Reveal curves](reveal.md), [Plots](plots.md).
-The executed hello-world is
-[Tabular demo](notebooks/01_tabular_quickstart.ipynb).
+The ranking and the reveal curve are covered properly under
+[Checking the ranking by revealing less](reveal.md), and the drawings
+under [Plots](plots.md). If you would like to watch the whole
+pipeline run, the [Tabular demo](notebooks/01_tabular_quickstart.ipynb)
+executes it end to end.
 
-## Next steps
+## Where to go from here
 
-- Better fits and keeping them: [Tuning and saving](workflows.md).
-- What to check before trusting: [Limits](capacity.md) (tables are
-  the easy case — the caveats bite text and images).
+- Fitting better and keeping the result: [Tuning and saving](workflows.md).
+- What to verify before trusting: [Limits](capacity.md) — though
+  tables are honestly the easy case, and most of the caveats there
+  concern text and images.

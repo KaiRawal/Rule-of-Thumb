@@ -1,15 +1,19 @@
 # Get started
 
-Three steps, about ten minutes total:
+Welcome — you can be explaining your first model about ten minutes
+from now, in three short stages:
 
-1. [Install](install.md) the package (plus one extra for your data type).
-2. Run the [Quickstart](quickstart.md): fit a stand-in to a toy model
-   and read your first explanation.
+1. [Install](install.md) the package, plus one optional extra that
+   matches your kind of data.
+2. Work through the [Quickstart](quickstart.md): you will fit a
+   stand-in to a toy model and read your first explanation.
 3. Skim [Core ideas](concepts.md) so the vocabulary — black box,
-   importance, order, reveal — feels natural before the [Guide](guide.md).
+   importance, order, reveal — feels familiar before the
+   [Guide](guide.md) puts it to work.
 
-No background in explainability is assumed. Familiarity with Python,
-NumPy, and scikit-learn-style `fit` / `predict` is enough.
+Nothing here assumes you have met explainability before. If you are
+comfortable with Python, NumPy, and scikit-learn-style `fit` and
+`predict`, you already know everything this section will ask of you.
 
 ```{toctree}
 :hidden:

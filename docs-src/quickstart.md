@@ -1,14 +1,16 @@
 # Quickstart
 
-Your first explanation in five minutes, using a table of numbers —
-the same shape as any scikit-learn dataset. Everything below runs on
-CPU in seconds.
+Let's fit your first explanation. It takes about five minutes, uses a
+small table of numbers — the same shape as any scikit-learn dataset —
+and everything below runs on CPU in seconds.
 
-## 1. Make a toy black box
+## Preparing a toy black box
 
-A "black box" is just something that turns inputs into answers and
-won't tell you how. Here the box calls a row class 1 when its first
-two columns sum past 1:
+A "black box" is simply something that turns inputs into answers
+without telling you how. Ours will be deliberately transparent: a row
+counts as class 1 whenever its first two columns sum past 1. (In real
+life you would put your model's own predictions here — the code does
+not care where the answers came from.)
 
 ```python
 import numpy as np
@@ -19,33 +21,41 @@ X = rng.rand(1000, 4).astype(np.float32)
 y_answers = ((X[:, 0] + X[:, 1]) > 1.0).astype(np.int64)  # e.g. model.predict(X)
 ```
 
-## 2. Fit the stand-in
+## Fitting the stand-in
 
-`fit_tabular` learns a simple model that copies those answers:
+`fit_tabular` learns a small model whose only job is to copy those
+answers:
 
 ```python
 exp = rot.fit_tabular(y_answers, X, epochs=30, seed=0)
 print(f"agreement: {exp.train_agreement_:.2f}")  # stand-in vs box, want ~1.0
 ```
 
-`train_agreement_` is the fraction of answers the stand-in gets right.
-Near 1 means the explanation below is worth reading; far below means
-stop and check [Limits](capacity.md) first.
+That agreement score is the fraction of answers the stand-in gets
+right. Close to 1 means the explanation below is worth reading; if it
+ever lands far below, stop and visit [Limits](capacity.md) before
+going further.
 
-## 3. Read the explanation
+## Reading the explanation
 
-One signed number per column, per row. Positive pushes *toward* the
-predicted answer, negative pushes *away*:
+You get one signed number per column, per row. Positive numbers
+pushed *toward* the predicted answer, negative ones pushed *away*:
 
 ```python
 imp = exp.get_explanation(X[:5])  # shape [5, 4]
 print(imp[0])  # e.g. [0.9, 0.7, 0.0, -0.0]: columns 0 and 1 did the work
 ```
 
-## 4. Rank and reveal
+Columns 2 and 3 sit near zero, which is exactly right — the box never
+looked at them. That moment, where the numbers confirm something you
+already knew, is a good way to calibrate your trust before moving on
+to models you cannot see inside.
 
-`get_order` sorts columns most-important-first per row; `score_ordering`
-uncovers them in that order and re-checks the answer at each step:
+## Ranking inputs and checking the ranking
+
+`get_order` sorts each row's columns most-important-first, and
+`score_ordering` uncovers them in that order, re-checking the answer
+at every step:
 
 ```python
 import torch
@@ -57,8 +67,9 @@ curve = exp.score_ordering(points, labels, order)
 print(curve)  # accuracy after 0, 1, 2, ... columns revealed
 ```
 
-A good order reaches full accuracy after one or two columns. Plot it
-with `plot.reveal` (see [Reveal curves](reveal.md)):
+A ranking you can believe in reaches full accuracy after one or two
+columns. `plot.reveal` draws that story for you (see
+[Checking the ranking by revealing less](reveal.md)):
 
 ```{image} _static/figures/reveal.light.png
 :class: only-light
@@ -70,7 +81,7 @@ with `plot.reveal` (see [Reveal curves](reveal.md)):
 :alt: Accuracy climbing to 1 after one revealed input for the learned order, slowly for random
 ```
 
-## 5. Draw it and keep it
+## Drawing it and keeping it
 
 ```python
 from ruleofthumb import plot
@@ -82,14 +93,17 @@ exp.save("explainer.rotx")
 loaded = rot.load_explainer("explainer.rotx")
 ```
 
-`plot.waterfall` shows one answer as stacked contributions; every plot
-function returns a `Figure` and never shows it for you. See
-[Plots](plots.md) for the full gallery.
+`plot.waterfall` renders a single answer as stacked contributions,
+and like every plotting function it hands you a `Figure` without
+displaying anything — saving and showing stay your decision. The
+full gallery lives under [Plots](plots.md).
 
-## Next steps
+## Where to go from here
 
-- Sentences instead of tables? [Text](text.md).
-- Pictures instead of tables? [Images](image.md) and the runnable
-  [Shapes demo](notebooks/06_shapes_demo.ipynb).
-- The ideas behind the calls? [Core ideas](concepts.md).
-- Every function documented? [API reference](api.md).
+- Working with sentences rather than tables? Head to [Text](text.md).
+- Working with pictures? [Images](image.md) awaits, with the runnable
+  [Shapes demo](notebooks/06_shapes_demo.ipynb) alongside it.
+- Curious about the ideas behind these calls? [Core ideas](concepts.md)
+  tells that story from the beginning.
+- After something specific? The [API reference](api.md) documents
+  every public function.

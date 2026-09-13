@@ -1,7 +1,11 @@
-# Reveal curves
+# Checking the ranking by revealing less
 
-The payoff for the whole package: a good ranking keeps the black
-box's answer after revealing very little. Three calls:
+A ranking is only as good as its proof, and the reveal curve is that
+proof: uncover each row's inputs most-important-first, re-check the
+answer at every step, and see how little it takes to hold steady. A
+ranking you can believe in keeps the black box's answer after
+revealing very little; a random one needs most of the input. Three
+calls tell the whole story:
 
 ```python
 order = exp.get_order(inputs)                          # best first
@@ -9,9 +13,10 @@ preds = exp.ordered_predict(inputs, order)             # answers per step
 curve = exp.score_ordering(inputs, answers, order)     # accuracy per step
 ```
 
-`curve[k]` is the accuracy after uncovering the top-`k` pieces
-(columns, words, or pixels — one step covers a whole unit). Compare
-against a random order: the learned order should climb faster.
+`curve[k]` is the accuracy after uncovering the top-`k` pieces —
+columns, words, or pixels, where one step always covers a whole unit.
+Drawn against a random order, the learned curve should climb earlier
+and stay there:
 
 ```python
 fig = plot.reveal({"RoT order": curve, "Random": random_curve})
@@ -27,22 +32,27 @@ fig = plot.reveal({"RoT order": curve, "Random": random_curve})
 :alt: Learned order reaching full accuracy after one input versus random climbing slowly
 ```
 
-## Rules that bite
+## Details worth knowing before you rely on this
 
-- **Units by default.** Embedding dims (text) and channels (images)
-  are revealed together. `granularity="element"` reveals individual
-  numbers instead — but the value must match how the order was made.
-  Tables are unaffected (one step per column).
-- **Filler is trimmed.** Steps where every row has exhausted its real
-  pieces are dropped; per-step accuracy only counts rows still going.
-  `include_padded=True` keeps the full rectangle instead.
-- **Orders carry padding.** Filler ranks last as `-1`; that is why
-  `score_ordering` takes no mask. Argument order is
-  `score_ordering(inputs, answers, order)` — swapping the first two
-  raises a `ValueError` that says so.
-- **Metrics.** Default is accuracy (any number of answers).
-  `return_confusion=True` gives per-step confusion counts instead;
-  `metric=` accepts a custom callable over binary counts.
+- **Units travel together by default.** A word's embedding dimensions
+  (text) and a pixel's channels (images) are revealed as one.
+  `granularity="element"` reveals individual numbers instead — but
+  the value must match how the order was produced, since nothing
+  detects a mismatch for you. Tables are unaffected: one step per
+  column, always.
+- **Filler is trimmed, not plotted.** Steps where every row has
+  exhausted its genuine pieces are dropped, and per-step accuracy
+  counts only the rows still going. `include_padded=True` keeps the
+  full rectangle instead, if you ever want it.
+- **Orders already carry their padding.** Filler ranks last as `-1`,
+  which is why `score_ordering` takes no mask. Mind the argument
+  order — `score_ordering(inputs, answers, order)` — since swapping
+  the first two raises a `ValueError` that tells you exactly that.
+- **Accuracy is the default lens.** It works for any number of
+  answers. `return_confusion=True` gives per-step confusion counts
+  instead, and `metric=` accepts a custom callable over binary
+  counts for the two-answer case.
 
-The runnable version is the
-[Shapes demo](notebooks/06_shapes_demo.ipynb).
+To watch this run on real (if tiny) data, the
+[Shapes demo](notebooks/06_shapes_demo.ipynb) ends with exactly this
+comparison.
