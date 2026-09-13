@@ -144,6 +144,43 @@ are provenance notes only; the legacy code did not move with the package.
     candidate to completion). Cross-refs item 16 (capacity ceilings bound
     what "fit" can mean) and item 23 (stability across minima).
 
+30. **Opt-in explanation evaluation (agreement, reveal gap, human-data
+    comparison).** An explicit `Explainer.evaluate(...)` reporting only
+    realised, research-backed measures: (a) **fit agreement** —
+    in-sample plus a seeded held-out split, warning below 0.75
+    (extends the existing `train_agreement_` tripwire rather than
+    replacing it); (b) **reveal gap** — reveal-curve AUC minus a seeded
+    random-order AUC via the existing `score_ordering`, computed only
+    on explicit request and off by default; (c) **human-data comparison
+    iff supplied** — length-weighted AUROC of importances against
+    user-provided rationale masks with a random-importance baseline
+    alongside (movie-review/judicial practice: per-span scores,
+    sign-flipped toward the predicted class), text-first and
+    mask-aware. Shipped defaults this item records: `autotune` scores
+    by plain held-out agreement unless `scoring="reveal"` is named,
+    and fits never run reveal machinery (only `predict` for the
+    agreement tripwire). Explicitly out of scope: seed-stability
+    refits, slice breakdowns, center priors, new dependencies, and
+     black-box insertion scoring — the package never holds the model,
+     only its labels, so interventions stay an opt-in accuracy-testing
+     path, never a default.
+
+31. **Per-datapoint misprediction warning (pending).** When a user
+    explains rows whose model predictions are known, rows the
+    stand-in itself gets wrong deserve a warning: their explanations
+    are absurd and meaningless, and the user should be told so —
+    without any error or blocking path. Design: an optional
+    `y_outputs=` kwarg on `Explainer.get_explanation` (the method
+    otherwise never sees black-box answers, so nothing changes unless
+    the kwarg is passed); on mismatch, a single `UserWarning` per
+    call naming the count and row indices (capped list). Plot helpers
+    call `get_explanation` internally without labels and stay silent;
+    `get_order` never computes explanations and is out of scope.
+    Length mismatches fail fast with `ValueError`, matching the
+    file's existing style. Tests: mismatched rows warn with correct
+    indices, matching rows stay quiet, plus multiclass and masked-text
+    cases. Not started.
+
 ## Release / maintenance
 
 18. PyPI release checklist: three-place version bump (`pyproject.toml`,

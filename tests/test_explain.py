@@ -372,3 +372,20 @@ def test_fit_quality_quiet_on_clean_task(tabular_data):
         warnings.simplefilter("error")
         exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
     assert exp.train_agreement_ >= 0.75
+
+
+def test_fits_run_no_reveal_machinery(tabular_data, monkeypatch):
+    """Fitting evaluates only model accuracy: the reveal pipeline never runs at fit time."""
+    from ruleofthumb import fit_tabular
+    from ruleofthumb.explain import Explainer
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("fits must not invoke the reveal pipeline")
+
+    monkeypatch.setattr(Explainer, "get_order", _forbidden)
+    monkeypatch.setattr(Explainer, "ordered_predict", _forbidden)
+    monkeypatch.setattr(Explainer, "score_ordering", _forbidden)
+
+    x, y = tabular_data
+    exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
+    assert exp.train_agreement_ >= 0.75

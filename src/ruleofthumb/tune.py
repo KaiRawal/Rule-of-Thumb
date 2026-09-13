@@ -2,8 +2,9 @@
 
 Keras-tuner-style search over the exposed training hyperparameters
 (``learning_rate``, ``batch_size``, ``epochs``, ``weight_decay``):
-candidates are fitted on a seeded train split, scored on held-out data by
-final-step reveal fidelity, and the winner is refit on all data. Dropout is
+candidates are fitted on a seeded train split, scored on held-out data
+(by plain agreement unless ``scoring="reveal"`` is named), and the
+winner is refit on all data. Dropout is
 a fixed method constant (0.5) and is never searched.
 """
 
@@ -35,7 +36,9 @@ class AutotuneResult:
     Attributes:
         explainer: the winning configuration refit on **all** data.
         best_params: hyperparameters of the best validation candidate.
-        best_score: held-out final-step reveal accuracy of that candidate.
+        best_score: held-out score of that candidate under the requested
+            ``scoring`` (plain agreement by default, final-step reveal
+            accuracy only when ``scoring="reveal"`` was named).
         trials: every candidate as ``{"params": ..., "score": ...}``,
             sorted best-first.
     """
@@ -106,11 +109,29 @@ def _split_kwargs(kwargs, indices, n):
     return {key: _split_value(value, indices, n) for key, value in kwargs.items()}
 
 
-def _validation_score(explainer, x_val, y_val, mask=None):
-    """Final-step reveal accuracy on held-out data."""
+def _agreement_score(explainer, x_val, y_val, mask=None):
+    """Plain held-out agreement: surrogate predictions vs black-box labels.
+
+    No reveal machinery runs here — this is the default candidate
+    scoring, so tuning stays free of interventions unless asked.
+    """
+    kwargs = {"mask": mask} if mask is not None else {}
+    preds = np.asarray(explainer.predict(x_val, **kwargs).cpu())
+    return float((preds == np.asarray(y_val).flatten()).mean())
+
+
+def _reveal_score(explainer, x_val, y_val, mask=None):
+    """Final-step reveal accuracy on held-out data.
+
+    Runs the reveal pipeline (`get_order` + `score_ordering`) against
+    the surrogate — used only when ``scoring="reveal"`` is named.
+    """
     order = explainer.get_order(x_val, mask=mask)
     curve = explainer.score_ordering(x_val, torch.from_numpy(np.asarray(y_val).astype(np.int64)), order)
     return float(curve[-1])
+
+
+_SCORINGS = {"agreement": _agreement_score, "reveal": _reveal_score}
 
 
 def autotune(
@@ -125,14 +146,14 @@ def autotune(
     seed: int | None = None,
     device: Any | None = None,
     n_classes: int | None = None,
+    scoring: str = "agreement",
     **model_kwargs: Any,
 ) -> AutotuneResult:
     """Search the training hyperparameters and return the best fitted explainer.
 
     Candidates are fitted on a seeded train split via the regular
     :func:`fit_tabular` / :func:`fit_text` / :func:`fit_image` factories,
-    scored on the held-out split by final-step reveal accuracy (the
-    surrogate's predicted-class accuracy at full reveal), and the winner is
+    scored on the held-out split, and the winner is
     refit on **all** data. Each candidate gets its own seed (``seed + i``)
     so comparisons are fair.
 
@@ -147,6 +168,11 @@ def autotune(
         space: hyperparameter search space; defaults to
             :data:`DEFAULT_SPACE`. Keys must be a subset of it.
         validation_split: fraction of samples held out for scoring.
+        scoring: ``"agreement"`` (default) scores candidates by plain
+            held-out surrogate-vs-label agreement, running no reveal
+            machinery; ``"reveal"`` scores by final-step reveal accuracy
+            (the surrogate's predicted-class accuracy at full reveal)
+            instead. Reveal-based scoring runs only when named here.
         seed: controls the split, candidate sampling and candidate fits.
         device: forwarded to the factories.
         n_classes: forwarded to the factories; inferred from
@@ -162,6 +188,8 @@ def autotune(
     """
     if search not in ("random", "grid"):
         raise ValueError(f"unknown search strategy: {search!r}")
+    if scoring not in _SCORINGS:
+        raise ValueError(f"unknown scoring: {scoring!r}; expected one of {sorted(_SCORINGS)}")
     if not 0 < validation_split < 1:
         raise ValueError("validation_split must be in (0, 1)")
     space = DEFAULT_SPACE if space is None else space
@@ -188,7 +216,7 @@ def autotune(
         candidate = factory(
             y_train, x_train, seed=candidate_seed, device=device, n_classes=n_classes, **train_kwargs, **params
         )
-        score = _validation_score(candidate, x_val, y_val, mask=val_mask)
+        score = _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)
         trials.append({"params": params, "score": score})
     trials.sort(key=lambda trial: trial["score"], reverse=True)
 

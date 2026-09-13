@@ -7,9 +7,13 @@ then gestures at going beyond straight lines and at choosing hardware.
 ## Letting the package search for you
 
 `rot.autotune` tries a spread of learning rates, batch sizes, epochs,
-and weight-decay settings, keeps whichever scores best on held-out reveal
-fidelity, and refits the winner on all of your data. Dropout stays fixed
-at 0.5 — the method needs every partial observation equally likely:
+and weight-decay settings, keeps whichever scores best on held-out
+agreement, and refits the winner on all of your data. Scoring stays
+deliberately plain — just surrogate-vs-label accuracy, no reveal
+machinery — unless you explicitly ask for `scoring="reveal"`, which
+scores candidates by final-step reveal accuracy instead. Dropout stays
+fixed at 0.5 — the method needs every partial observation equally
+likely:
 
 ```python
 result = rot.autotune(y_answers, X, search="random", n_candidates=8, seed=0)

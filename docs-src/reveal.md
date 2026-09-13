@@ -1,11 +1,13 @@
 # Checking the ranking by revealing less
 
 A ranking is only as good as its proof, and the reveal curve is that
-proof: uncover each row's inputs most-important-first, re-check the
-answer at every step, and see how little it takes to hold steady. A
-ranking you can believe in keeps the black box's answer after
-revealing very little; a random one needs most of the input. Three
-calls tell the whole story:
+proof — strictly optional, run only when you ask for it. Uncover each
+row's inputs most-important-first and re-check the answer at every
+step, and see how little it takes to hold steady. A ranking you can
+believe in keeps the *stand-in's* answer after revealing very little;
+a random one needs most of the input. Nothing here queries your
+model: every step re-scores the surrogate, so this tests the ranking,
+never the black box. Three calls tell the whole story:
 
 ```python
 order = exp.get_order(inputs)                          # best first

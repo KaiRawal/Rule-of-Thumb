@@ -82,8 +82,9 @@ plot.reveal({"RoT order": good, "Random": baseline})
 
 Each curve is one value per reveal step — the outputs of
 `score_ordering` — drawn so the learned order can be judged against
-chance at a glance. See [Checking the ranking by revealing
-less](reveal.md).
+chance at a glance. Like everything on the reveal path, this
+re-scores the surrogate only; your model is never queried. See
+[Checking the ranking by revealing less](reveal.md).
 
 Every call on this page appears in runnable form under
 [Examples](examples.md).

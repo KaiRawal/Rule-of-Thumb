@@ -32,9 +32,12 @@ print(f"agreement: {exp.train_agreement_:.2f}")  # stand-in vs box, want ~1.0
 ```
 
 That agreement score is the fraction of answers the stand-in gets
-right. Close to 1 means the explanation below is worth reading; if it
-ever lands far below, stop and visit [Limits](capacity.md) before
-going further.
+right — the single most important number on this page. Close to 1
+means the explanation below is worth reading; if it ever lands far
+below, stop and visit [Limits](capacity.md) before going further.
+Fitting always reports it, and warns you outright below 0.75, so a
+bad fit can never slip past quietly. Nothing else on this page runs
+until you ask it to: fitting measures accuracy, full stop.
 
 ## Reading the explanation
 
@@ -51,11 +54,15 @@ looked at them. That moment, where the numbers confirm something you
 already knew, is a good way to calibrate your trust before moving on
 to models you cannot see inside.
 
-## Ranking inputs and checking the ranking
+## Optionally checking the ranking
 
-`get_order` sorts each row's columns most-important-first, and
-`score_ordering` uncovers them in that order, re-checking the answer
-at every step:
+The explanation above is complete on its own. If you additionally
+want to verify the ranking — asking "does the answer survive on the
+top-ranked columns alone?" — `get_order` sorts each row's columns
+most-important-first, and `score_ordering` uncovers them in that
+order, re-checking the answer at every step. Note what is being
+re-checked: the *stand-in's* answers, never fresh queries to your
+model. This is a self-check you run only when you want it:
 
 ```python
 import torch

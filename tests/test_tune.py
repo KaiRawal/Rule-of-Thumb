@@ -80,7 +80,7 @@ def test_validation_split_sizes():
 
 
 def test_search_finds_a_genuinely_good_fit():
-    """The winner must reach high held-out accuracy and beat a bad config by a margin."""
+    """The winner must reach high held-out agreement and beat a bad config by a margin."""
     x, y = _separable_dataset()
     space = {
         "learning_rate": [1e-5, 0.05],
@@ -93,12 +93,54 @@ def test_search_finds_a_genuinely_good_fit():
     assert result.best_score >= 0.85
 
     bad = fit_tabular(y, x, epochs=1, batch_size=64, learning_rate=1e-5, weight_decay=0.05, seed=0)
-    xt = torch.from_numpy(x)
-    order = bad.get_order(xt)
-    curve = bad.score_ordering(xt, torch.from_numpy(y), order)
-    bad_score = float(curve[-1])
+    bad_preds = np.asarray(bad.predict(torch.from_numpy(x)).cpu())
+    bad_score = float((bad_preds == y).mean())
     assert result.best_score >= bad_score + 0.15
     assert result.best_params["epochs"] == 200 and result.best_params["learning_rate"] == 0.05
+
+
+def test_reveal_scoring_is_opt_in():
+    """Reveal-based candidate scoring runs only when scoring="reveal" is named."""
+    x, y = _separable_dataset()
+    space = {
+        "learning_rate": [1e-5, 0.05],
+        "batch_size": [64],
+        "epochs": [1, 200],
+        "weight_decay": [0.0],
+    }
+    result = autotune(
+        y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0, scoring="reveal"
+    )
+
+    assert result.best_score >= 0.85
+    assert result.best_params["epochs"] == 200 and result.best_params["learning_rate"] == 0.05
+
+
+def test_unknown_scoring_raises():
+    x, y = _separable_dataset()
+    with pytest.raises(ValueError, match="unknown scoring"):
+        autotune(y, x, modality="tabular", search="grid", space={"learning_rate": [0.05]}, seed=0, scoring="auc")
+
+
+def test_default_tuning_runs_no_reveal_machinery(monkeypatch):
+    """Default scoring must not invoke the reveal pipeline; opt-in scoring must."""
+    from ruleofthumb.explain import Explainer
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("reveal machinery must not run unless scoring='reveal' is named")
+
+    for name in ("get_order", "ordered_predict", "score_ordering"):
+        monkeypatch.setattr(Explainer, name, _forbidden)
+
+    x, y = _separable_dataset()
+    space = {"learning_rate": [0.05], "epochs": [4], "batch_size": [64]}
+    result = autotune(y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0)
+    assert np.isfinite(result.best_score)
+
+    with pytest.raises(AssertionError, match="reveal machinery"):
+        autotune(
+            y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0, scoring="reveal"
+        )
 
 
 def test_refit_explainer_is_accurate_on_all_data():
