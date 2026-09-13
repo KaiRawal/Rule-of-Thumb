@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Development guide
 
 How this repo is built, checked, and released. Start here before your

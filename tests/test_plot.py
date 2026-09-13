@@ -125,6 +125,53 @@ def test_saliency_parameter_sweep_renders(power, trim):
     plt.close("all")
 
 
+def test_reveal_single_curve_returns_figure():
+    fig = plot.reveal(np.array([0.5, 0.7, 0.9]))
+    assert isinstance(fig, Figure)
+    plt.close("all")
+
+
+def test_reveal_dict_overlay_labels_both_curves():
+    fig = plot.reveal(
+        {"RoT order": np.array([0.5, 0.8, 1.0]), "Random": np.array([0.5, 0.55, 0.6])},
+        title="payoff",
+    )
+    assert isinstance(fig, Figure)
+    labels = [text.get_text() for text in fig.axes[0].get_legend().get_texts()]
+    assert labels == ["RoT order", "Random"]
+    plt.close("all")
+
+
+def test_reveal_accepts_torch_and_list_with_labels():
+    import torch
+
+    fig = plot.reveal(
+        [torch.tensor([0.4, 0.6]), np.array([0.5, 0.55])],
+        labels=["rot", "random"],
+    )
+    assert isinstance(fig, Figure)
+    plt.close("all")
+
+
+def test_reveal_rejects_empty_and_mismatched_labels():
+    with pytest.raises(ValueError, match="at least one curve"):
+        plot.reveal([])
+    with pytest.raises(ValueError, match="at least one curve"):
+        plot.reveal({})
+    with pytest.raises(ValueError, match="empty"):
+        plot.reveal(np.array([]))
+    with pytest.raises(ValueError, match="one label per curve"):
+        plot.reveal([np.array([0.5]), np.array([0.6])], labels=["only-one"])
+    plt.close("all")
+
+
+def test_reveal_draws_into_existing_axes():
+    fig, ax = plt.subplots()
+    out = plot.reveal(np.array([0.5, 1.0]), ax=ax)
+    assert out is fig and len(ax.lines) == 1
+    plt.close("all")
+
+
 @pytest.mark.parametrize("class_idx", [0, 1, 2])
 def test_multiclass_per_class_plots_render(class_idx):
     from ruleofthumb import fit_tabular

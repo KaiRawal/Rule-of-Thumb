@@ -1,46 +1,48 @@
-# Tabular guide
+# Tabular
 
-Fits a transparent surrogate to a black box on vector inputs, returning one
-signed importance weight per feature. Positive means evidence toward class 1
-(binary); for `n_classes > 2` the output is per-class.
+Tables of numbers: `X` is `[rows, columns]`, `y` is one integer answer
+per row. One importance number per column.
 
-## Minimal fit
+## Try it
 
 ```python
 import numpy as np
 import ruleofthumb as rot
 
-X_train = np.random.rand(1000, 4).astype(np.float32)
-black_box_probs = (X_train[:, 0] > 0.5).astype(np.int64)  # e.g. model.predict(X_train)
+X = np.random.RandomState(0).rand(1000, 4).astype(np.float32)
+y_answers = ((X[:, 0] + X[:, 1]) > 1.0).astype(np.int64)
 
-exp = rot.fit(y_outputs=black_box_probs, x_inputs=X_train)   # or fit_tabular(...)
-importances = exp.get_explanation(X_train)  # signed, shape [N, d]
+exp = rot.fit_tabular(y_answers, X, epochs=30, seed=0)
+imp = exp.get_explanation(X)  # [1000, 4], signed
 ```
 
-`fit` auto-detects 2-D inputs as tabular; `fit_tabular` is the explicit
-equivalent. Both accept `n_classes=`, `seed=`, `pretrain_epochs=`,
-`weight_decay=` and `device=`; see {py:func}`rot.fit_tabular`.
+`fit` with a 2-D input does the same thing (it detects tables
+automatically); `fit_tabular` says it explicitly.
 
-## Reveal pipeline
+## Shapes and meanings
 
-`get_order` ranks features most-important-first per sample;
-`ordered_predict` re-scores the black-box labels as features are revealed;
-`score_ordering` summarises fidelity along the curve (default: per-step
-accuracy; `return_confusion=True` gives per-step K×K counts). Tabular is
-unaffected by the `granularity=` setting (one step per feature; see
-{ref}`Workflows: reveal curves <reveal-curves>`).
+- Binary (two answers): `get_explanation` returns `[N, D]` — the
+  contributions toward answer 1. Positive pushes toward 1, negative
+  toward 0.
+- More answers (`n_classes=`): returns `[N, K, D]` — one set per
+  answer, never collapsed.
+- Tabular takes no mask: every cell is real data.
 
-## Worked notebook
+## Rank, reveal, draw
 
+```python
+order = exp.get_order(X_torch)                    # [N, D], best first
+curve = exp.score_ordering(X_torch, y_torch, order)  # accuracy per step
+fig = plot.waterfall(exp, X[:1], feature_names=names)  # one answer
+fig = plot.bar(exp, X[:50], feature_names=names)       # whole batch
+```
+
+Details: [Reveal curves](reveal.md), [Plots](plots.md).
 The executed hello-world is
-`notebooks/01_tabular_quickstart.ipynb` (generated copy of
-`examples/01_tabular_quickstart.ipynb`, re-executed on every site build):
-a toy black box on synthetic data, surrogate fit, and importance inspection.
+[Tabular demo](notebooks/01_tabular_quickstart.ipynb).
 
 ## Next steps
 
-- Cross-cutting topics (tuning, persistence, non-linear shapes, plotting,
-  devices): [Workflows](workflows.md).
-- Raw model control (`RoT`, `score`, `importance`): {py:class}`rot.core.RoT`.
-- Capacity limits are modest here — the pooled-capacity caveat in
-  [Capacity](capacity.md) applies to text and images.
+- Better fits and keeping them: [Tuning and saving](workflows.md).
+- What to check before trusting: [Limits](capacity.md) (tables are
+  the easy case — the caveats bite text and images).

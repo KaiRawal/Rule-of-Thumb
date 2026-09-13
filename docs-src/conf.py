@@ -53,8 +53,8 @@ html_theme_options = {
     "show_toc_level": 2,
     "navigation_with_keys": True,
     "show_nav_level": 2,
-    "navigation_depth": 4,
-    "collapse_navigation": True,
+    "navigation_depth": 3,
+    "collapse_navigation": False,
     "navbar_align": "left",
     "show_prev_next": True,
     "back_to_top_button": True,
@@ -85,7 +85,7 @@ html_theme_options = {
     "footer_start": ["copyright", "sphinx-version"],
     "footer_end": ["theme-version"],
     "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink"],
-    "header_links_before_dropdown": 4,
+    "header_links_before_dropdown": 6,
 }
 html_context = {
     "github_user": "KaiRawal",

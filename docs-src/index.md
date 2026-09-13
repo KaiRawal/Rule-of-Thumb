@@ -5,165 +5,135 @@
 [![License](https://img.shields.io/github/license/KaiRawal/Rule-of-Thumb)](https://github.com/KaiRawal/Rule-of-Thumb/blob/main/LICENSE)
 [![Python](https://img.shields.io/pypi/pyversions/ruleofthumb-rot)](https://pypi.org/project/ruleofthumb-rot/)
 
-> ⚠️ **Experimental 0.0.x pre-alpha.** This package was entirely vibe-coded
-> from hand-written research code. It may break, and backwards-incompatible
-> changes are expected before any 1.0. Verify explanations before trusting
-> them.
+You have a model you can't open — it takes inputs and returns answers,
+and you want to know *why* it answered that way. Rule of Thumb (RoT)
+learns a simple stand-in that copies the model's answers, then tells you,
+for each answer, which inputs mattered and in which direction.
 
-:::{note}
-**Docs versions:** `stable` at `/en/stable/` matches the latest PyPI release (`pip install ruleofthumb-rot`); `latest` at `/en/latest/` tracks `main` and may describe unreleased APIs — install it from source (`pip install git+https://github.com/KaiRawal/Rule-of-Thumb.git` or `pip install .` from a clone). Use the version flyout (lower-right) to switch. The badge above reports the PyPI (`stable`) version.
-:::
+If you know scikit-learn, think `feature_importances_` — except the
+numbers are **signed** (positive pushes *toward* the predicted answer,
+negative pushes *away*) and they come with a ranking that lets you
+reveal inputs most-important-first while keeping the same answer.
 
-Explaining AI systems using partial information — a pip-installable
-library consolidating the Rule of Thumb (RoT) explainer into one package.
+```{image} _static/figures/hero.light.png
+:class: only-light
+:alt: Four-step diagram: unopenable model, simple stand-in, what mattered, same answer with fewer inputs
+```
+
+```{image} _static/figures/hero.dark.png
+:class: only-dark
+:alt: Four-step diagram: unopenable model, simple stand-in, what mattered, same answer with fewer inputs
+```
 
 - 📄 Paper: https://arxiv.org/abs/2608.10766
 - 🌐 Project website: https://kairawal.github.io/Rule-of-Thumb-Explaining-Artificial-Intelligence-Systems-using-Partial-Information/website/
 - 🔬 Research code: https://github.com/KaiRawal/Rule-of-Thumb-Explaining-Artificial-Intelligence-Systems-using-Partial-Information
 
-Rule of Thumb (RoT) trains a simple, transparent surrogate on partial
-observations of a black-box model's behaviour, producing per-feature
-importances that can be revealed incrementally (most-important-first)
-while preserving the black box's predictions.
+## Three modalities, one pattern
 
-<div class="rot-gallery">
+```{image} _static/figures/card-tabular.light.png
+:class: only-light
+:alt: Bar chart of per-column importances, red toward the answer and blue against
+```
 
-<div class="rot-card">
+```{image} _static/figures/card-tabular.dark.png
+:class: only-dark
+:alt: Bar chart of per-column importances, red toward the answer and blue against
+```
 
-**Tabular** — vector inputs, one weight per feature — `fit_tabular` / `RoT`.
+**Tabular** — rows and columns, like any sklearn dataset.
+One number per column:
 
-</div>
+```python
+exp = rot.fit_tabular(y_answers, X_table)
+imp = exp.get_explanation(X_table)  # [N, columns]
+```
 
-<div class="rot-card">
+```{image} _static/figures/card-text.light.png
+:class: only-light
+:alt: Sentence with the word wonderful highlighted red
+```
 
-**Text** — token-by-embedding with masks — `fit_text` / `RoTText`.
+```{image} _static/figures/card-text.dark.png
+:class: only-dark
+:alt: Sentence with the word wonderful highlighted red
+```
 
-</div>
+**Text** — sentences in, one number per word out.
+Pass raw strings; padding is handled for you:
 
-<div class="rot-card">
+```python
+exp = rot.fit_text(y_answers, ["a wonderful film", "terrible pacing"])
+imp = exp.get_explanation(["a wonderful film", "terrible pacing"])  # [N, words]
+```
 
-**Images** — feature-map importance across pixels — `fit_image` / `RoTImage`.
+```{image} _static/figures/card-image.light.png
+:class: only-light
+:alt: Circle image with red saliency overlay on the circle
+```
 
-</div>
+```{image} _static/figures/card-image.dark.png
+:class: only-dark
+:alt: Circle image with red saliency overlay on the circle
+```
 
-</div>
+**Images** — pictures in, one number per pixel out.
+Pass file paths; they are embedded through a frozen backbone:
+
+```python
+exp = rot.fit_image(y_answers, ["cat.jpg", "dog.jpg"])
+imp = exp.get_explanation(["cat.jpg", "dog.jpg"])  # [N, H, W]
+```
 
 ## Install
 
-Requires Python >= 3.9. The base install is minimal (`numpy` + `torch`);
-modality extras pull only what you need:
-
-**Stable (from PyPI):**
 ```bash
 pip install ruleofthumb-rot
-pip install "ruleofthumb-rot[text]"    # transformers (raw-string ingestion)
-pip install "ruleofthumb-rot[image]"   # torchvision, Pillow, captum (image files/backbones)
-pip install "ruleofthumb-rot[plot]"    # matplotlib, wordcloud, shap, shap-editorial
+pip install "ruleofthumb-rot[text]"    # raw-sentence support
+pip install "ruleofthumb-rot[image]"   # image files and backbones
+pip install "ruleofthumb-rot[plot]"    # visualisations
 ```
 
-**Latest (unreleased, from source):**
-```bash
-pip install git+https://github.com/KaiRawal/Rule-of-Thumb.git
-# or from a clone:
-pip install .                          # add [text,image,plot] as needed
-```
+Tracking unreleased `main`? See [Install](install.md) for the source
+install and version notes.
 
-From source (this repo's root):
+:::{warning}
+The numbers copy the *model*, not the truth. Every fit reports an
+agreement score against the model's answers — check it before believing
+an explanation. See [Limits](capacity.md).
+:::
 
-```bash
-pip install .
-```
+## Next steps
 
-For development:
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,text,image,plot]"
-pytest
-```
-
-## Guides
-
-- [Quickstart](quickstart.md) — all three modalities in one page.
-- [Tabular](tabular.md) · [Text](text.md) · [Image](image.md) —
-  per-modality usage with worked notebooks.
-- [Workflows](workflows.md) — reveal curves, tuning, persistence,
-  non-linear shapes, plotting, devices.
-- [Migration](migration.md) — breaking changes across the 0.x line.
-- [Capacity](capacity.md) — pooled-model fidelity ceilings and backbone
-  guidance. Read this before trusting an explanation.
-- [Test report](test-report.md) — the maintained test-suite report.
-
-(symbol-index)=
-
-## Symbol index
-
-Every public symbol, each rendered on the [API reference](api.md):
-
-| Symbol | What it is |
-|---|---|
-| `fit` | Auto-detecting factory (all modalities) |
-| `fit_tabular` | Tabular factory |
-| `fit_text` | Text / embedding factory |
-| `fit_image` | Image factory |
-| `Explainer` | Fitted explainer facade |
-| `load_explainer` | Reload a saved explainer |
-| `autotune` | Hyperparameter search |
-| `AutotuneResult` | Tuning result (`.explainer`, `.best_params`, `.trials`) |
-| `embed_texts` | Transformer text embedder |
-| `TextEmbeddings` | Embedding result (embeddings, mask, tokens) |
-| `DEFAULT_TEXT_MODEL` | Bundled embedding model name |
-| `DEFAULT_TEXT_REVISION` | Pinned revision of the bundled model |
-| `load_images` | Image-file loader (raw pixels) |
-| `ImageBatch` | Loaded images + validity mask |
-| `embed_images` | Image-file embedder (backbone maps) |
-| `ImageEmbeddings` | Embedding result (maps, mask) |
-| `DEFAULT_IMAGE_MODEL` | Default backbone name |
-| `pad_sequences` | Ragged text → rectangular batch |
-| `lengths_to_mask` | Token counts → boolean validity mask |
-| `pad_images` | Mixed-size images → one batch |
-| `core.RoT` | Raw tabular model |
-| `text.RoTText` | Raw text model |
-| `image.RoTImage` | Raw image model |
-| `plot` | Visualisations for every modality |
-
-## Examples
-
-Hello-world notebooks on dummy data (no downloads or GPUs needed),
-re-executed on every site build under *Notebooks*:
-
-- `examples/01_tabular_quickstart.ipynb`
-- `examples/02_text_quickstart.ipynb`
-- `examples/03_image_quickstart.ipynb`
-
-## Licence
-
-MIT — see `LICENSE`. Note the experimental caveat above still applies.
+- New here? Start at [Get started](start.md): install, a 5-minute
+  first explanation, and the core ideas.
+- Ready to use it? The [Guide](guide.md) covers each modality plus
+  reveal curves, plots, tuning, and saving.
+- Want runnable code? [Examples](examples.md) runs on dummy data in
+  seconds; [API reference](api.md) documents every public function.
 
 ```{toctree}
 :hidden:
 :maxdepth: 2
 :caption: Get started
 
-quickstart
-notebooks/01_tabular_quickstart
-notebooks/02_text_quickstart
-notebooks/03_image_quickstart
-notebooks/04_hatexplain
-notebooks/05_salicon
+start
 ```
 
 ```{toctree}
 :hidden:
 :maxdepth: 2
-:caption: Guides
+:caption: Guide
 
-tabular
-text
-image
-workflows
-capacity
-migration
+guide
+```
+
+```{toctree}
+:hidden:
+:maxdepth: 2
+:caption: Examples
+
+examples
 ```
 
 ```{toctree}
@@ -172,13 +142,4 @@ migration
 :caption: Reference
 
 api
-test-report
-```
-
-```{toctree}
-:hidden:
-:maxdepth: 2
-:caption: Development
-
-development
 ```

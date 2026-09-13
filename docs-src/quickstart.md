@@ -1,81 +1,95 @@
 # Quickstart
 
-All three modalities on one page. For depth, see the per-modality guides
-([Tabular](tabular.md), [Text](text.md), [Image](image.md)) and
-[Workflows](workflows.md).
+Your first explanation in five minutes, using a table of numbers —
+the same shape as any scikit-learn dataset. Everything below runs on
+CPU in seconds.
 
-## Tabular
+## 1. Make a toy black box
 
-```python
-import numpy as np
-import ruleofthumb as rot
-
-X_train = np.random.rand(1000, 4).astype(np.float32)
-black_box_probs = (X_train[:, 0] > 0.5).astype(np.int64)
-
-exp = rot.fit(y_outputs=black_box_probs, x_inputs=X_train)
-importances = exp.get_explanation(X_train)
-```
-
-## Text / token embeddings
+A "black box" is just something that turns inputs into answers and
+won't tell you how. Here the box calls a row class 1 when its first
+two columns sum past 1:
 
 ```python
 import numpy as np
 import ruleofthumb as rot
-from ruleofthumb.text import lengths_to_mask, pad_sequences
 
-sequences = [np.random.rand(t, 384).astype(np.float32) for t in (20, 14, 17, 9)]
-x, lengths = pad_sequences(sequences)
-labels = np.array([1, 0, 1, 0], dtype=np.int64)
-mask = lengths_to_mask(lengths, x.shape[1]).numpy()
-
-exp = rot.fit_text(y_outputs=labels, x_inputs=x.numpy(), mask=mask)
-token_importances = exp.get_explanation(x.numpy(), mask=mask)
+rng = np.random.RandomState(0)
+X = rng.rand(1000, 4).astype(np.float32)
+y_answers = ((X[:, 0] + X[:, 1]) > 1.0).astype(np.int64)  # e.g. model.predict(X)
 ```
 
-Raw strings are embedded automatically (default
-`answerdotai/ModernBERT-base`):
+## 2. Fit the stand-in
+
+`fit_tabular` learns a simple model that copies those answers:
 
 ```python
-import ruleofthumb as rot
-
-exp = rot.fit_text(y_outputs=labels, x_inputs=["a wonderful film", "terrible pacing"])
-token_importances = exp.get_explanation(["a wonderful film", "terrible pacing"])
+exp = rot.fit_tabular(y_answers, X, epochs=30, seed=0)
+print(f"agreement: {exp.train_agreement_:.2f}")  # stand-in vs box, want ~1.0
 ```
 
-## Images
+`train_agreement_` is the fraction of answers the stand-in gets right.
+Near 1 means the explanation below is worth reading; far below means
+stop and check [Limits](capacity.md) first.
+
+## 3. Read the explanation
+
+One signed number per column, per row. Positive pushes *toward* the
+predicted answer, negative pushes *away*:
 
 ```python
-import numpy as np
+imp = exp.get_explanation(X[:5])  # shape [5, 4]
+print(imp[0])  # e.g. [0.9, 0.7, 0.0, -0.0]: columns 0 and 1 did the work
+```
+
+## 4. Rank and reveal
+
+`get_order` sorts columns most-important-first per row; `score_ordering`
+uncovers them in that order and re-checks the answer at each step:
+
+```python
 import torch
-import ruleofthumb as rot
-from ruleofthumb.image import pad_images
 
-images = [np.random.rand(3, h, w).astype(np.float32) for h, w in [(32, 32), (28, 40)]]
-labels = torch.randint(0, 2, (2,))
-
-x, mask = pad_images(images)
-exp = rot.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
-imp = exp.get_explanation(x.numpy(), mask=mask.numpy())
+points = torch.from_numpy(X[:200])
+labels = torch.from_numpy(y_answers[:200])
+order = exp.get_order(points)
+curve = exp.score_ordering(points, labels, order)
+print(curve)  # accuracy after 0, 1, 2, ... columns revealed
 ```
 
-Starting from image files? Paths embed through a frozen backbone by
-default (`mobilenet_v3_small`) — raw pixels pool to ink mass and cap
-fidelity on focal tasks, so prefer maps (pass `backbone=None` for pixels):
+A good order reaches full accuracy after one or two columns. Plot it
+with `plot.reveal` (see [Reveal curves](reveal.md)):
+
+```{image} _static/figures/reveal.light.png
+:class: only-light
+:alt: Accuracy climbing to 1 after one revealed input for the learned order, slowly for random
+```
+
+```{image} _static/figures/reveal.dark.png
+:class: only-dark
+:alt: Accuracy climbing to 1 after one revealed input for the learned order, slowly for random
+```
+
+## 5. Draw it and keep it
 
 ```python
-import ruleofthumb as rot
+from ruleofthumb import plot
 
-paths = ["cat.jpg", "dog.jpg"]
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths)
-imp = exp.get_explanation(paths)   # signed, shape [N, h, w] on the map grid
+fig = plot.waterfall(exp, X[:1], feature_names=["size", "age", "zip", "color"])
+fig.savefig("waterfall.png")
+
+exp.save("explainer.rotx")
+loaded = rot.load_explainer("explainer.rotx")
 ```
 
-Image file paths work directly too — see [Image](image.md) and the
-`notebooks/03_image_quickstart.ipynb` notebook.
+`plot.waterfall` shows one answer as stacked contributions; every plot
+function returns a `Figure` and never shows it for you. See
+[Plots](plots.md) for the full gallery.
 
 ## Next steps
 
-- [API reference](api.md) for every public entry point.
-- Executed *Notebooks* for runnable hello-worlds.
-- [Capacity](capacity.md) before trusting an explanation.
+- Sentences instead of tables? [Text](text.md).
+- Pictures instead of tables? [Images](image.md) and the runnable
+  [Shapes demo](notebooks/06_shapes_demo.ipynb).
+- The ideas behind the calls? [Core ideas](concepts.md).
+- Every function documented? [API reference](api.md).

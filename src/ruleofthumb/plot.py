@@ -281,6 +281,74 @@ def saliency(
     return figure
 
 
+def reveal(curves, *, labels=None, xlabel="# revealed", ylabel="accuracy", title=None, size=(6, 4), ax=None):
+    """Line plot of reveal-curve fidelity vs number of revealed units.
+
+    Each curve is the 1-D output of ``score_ordering`` (one value per
+    reveal step). Pass a single curve, a list of curves, or a
+    ``{name: curve}`` mapping to overlay good orders against baselines
+    such as random orders.
+
+    Args:
+        curves: 1-D array-like, list of 1-D array-likes, or mapping of
+            label to 1-D array-like. Torch tensors are accepted.
+        labels: optional names when ``curves`` is a list; ignored for
+            mappings (keys are used) and single curves.
+        xlabel: x-axis label.
+        ylabel: y-axis label.
+        title: optional title.
+        size: figure size when creating a new figure.
+        ax: optional existing axes to draw into.
+    """
+    import matplotlib.pyplot as plt
+
+    if isinstance(curves, dict):
+        names = list(curves.keys())
+        series = [curves[name] for name in names]
+    elif isinstance(curves, (list, tuple)):
+        series = list(curves)
+        if labels is not None:
+            names = list(labels)
+            if len(names) != len(series):
+                raise ValueError(
+                    f"reveal expects one label per curve, got {len(names)} labels for {len(series)} curves"
+                )
+        else:
+            names = [f"curve {i}" if len(series) > 1 else "accuracy" for i in range(len(series))]
+    else:
+        series = [curves]
+        names = list(labels) if labels is not None else ["accuracy"]
+        if len(names) != 1:
+            raise ValueError(f"reveal expects one label for a single curve, got {len(names)}")
+    if len(series) == 0:
+        raise ValueError("reveal expects at least one curve")
+
+    arrays = []
+    for index, curve in enumerate(series):
+        if hasattr(curve, "detach") and hasattr(curve, "cpu"):
+            curve = curve.detach().cpu()
+        arr = np.asarray(curve, dtype=np.float64).flatten()
+        if arr.size == 0:
+            raise ValueError(f"reveal curve {names[index]!r} is empty")
+        arrays.append(arr)
+
+    if ax is None:
+        figure, ax = plt.subplots(figsize=size)
+    else:
+        figure = ax.figure
+    for name, arr in zip(names, arrays):
+        ax.plot(np.arange(arr.size), arr, marker="o", markersize=3, label=name)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title is not None:
+        ax.set_title(title)
+    if len(arrays) > 1 or names[0] != "accuracy":
+        ax.legend(fontsize=9)
+    ax.set_ylim(-0.05, 1.05)
+    figure.tight_layout()
+    return figure
+
+
 def word_clouds(importance_rows, tokens_lists, *, stopwords=None, width=800, height=400, seed=0):
     """Positive, negative and combined word clouds from token-level explanations.
 

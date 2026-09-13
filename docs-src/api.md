@@ -1,21 +1,22 @@
 # API reference
 
-Every public entry point, rendered from docstrings. Start with `fit`,
-then pick a modality. All of these are also listed on the [landing
-page]({ref}`landing page <symbol-index>`).
+Every public function and class, rendered from docstrings. New here?
+Read [Core ideas](concepts.md) first, then pick your task below.
 
-## Facade
+## Fit: make an explainer
 
-```{eval-rst}
-.. autoclass:: ruleofthumb.Explainer
-   :members:
-```
+| Symbol | One line |
+|---|---|
+| `fit` | Detect the modality from the input shape and fit |
+| `fit_tabular` | Fit on tables `[N, columns]` |
+| `fit_text` | Fit on sentences (strings or `[N, tokens, dim]` + mask) |
+| `fit_image` | Fit on pictures (paths or `[N, C, H, W]` + mask) |
+| `Explainer` | The fitted object both factories return |
+| `load_explainer` | Reload a saved explainer without refitting |
 
 ```{eval-rst}
 .. autofunction:: ruleofthumb.fit
 ```
-
-(ruleofthumb.fit_tabular)=
 
 ```{eval-rst}
 .. autofunction:: ruleofthumb.fit_tabular
@@ -30,10 +31,35 @@ page]({ref}`landing page <symbol-index>`).
 ```
 
 ```{eval-rst}
+.. autoclass:: ruleofthumb.Explainer
+   :members: get_explanation, get_order, ordered_predict, score_ordering, score, predict, save
+```
+
+```{eval-rst}
 .. autofunction:: ruleofthumb.load_explainer
 ```
 
-## Tuning and ingestion
+## Explain: ask it questions
+
+The `Explainer` methods above are the whole asking surface:
+
+- `get_explanation(inputs)` — signed importances: tables `[N, D]`,
+  sentences `[N, T]`, pictures `[N, H, W]` (one set per answer when
+  there are more than two). Filler scores exactly zero.
+- `get_order(inputs)` — most-important-first ranking per row; filler
+  ranks last as `-1`.
+- `ordered_predict(inputs, order)` — answers while uncovering in rank
+  order. `score_ordering(inputs, answers, order)` — accuracy per step.
+- `score` / `predict` — the stand-in's own answers.
+
+## Tune and ingest
+
+| Symbol | One line |
+|---|---|
+| `autotune` / `AutotuneResult` | Search settings, refit the winner on all data |
+| `embed_texts` / `TextEmbeddings` | Strings → embeddings, mask, decoded tokens |
+| `load_images` / `ImageBatch` | Files → pixels plus validity mask |
+| `embed_images` / `ImageEmbeddings` | Files → backbone maps plus mask |
 
 ```{eval-rst}
 .. autofunction:: ruleofthumb.autotune
@@ -83,7 +109,13 @@ page]({ref}`landing page <symbol-index>`).
 .. autodata:: ruleofthumb.DEFAULT_IMAGE_MODEL
 ```
 
-## Utilities
+## Pad: batch the ragged
+
+| Symbol | One line |
+|---|---|
+| `pad_sequences` | Ragged embedding lists → one batch plus lengths |
+| `lengths_to_mask` | Lengths → boolean mask (`True` = real word) |
+| `pad_images` | Mixed-size pictures → one batch plus mask |
 
 ```{eval-rst}
 .. autofunction:: ruleofthumb.pad_sequences
@@ -97,9 +129,11 @@ page]({ref}`landing page <symbol-index>`).
 .. autofunction:: ruleofthumb.pad_images
 ```
 
-## Raw models
+## Raw models and plots
 
-(ruleofthumb.core.RoT)=
+`core.RoT`, `text.RoTText`, and `image.RoTImage` are the un-facaded
+models for full manual control — reach for them only when the
+factories get in your way.
 
 ```{eval-rst}
 .. autoclass:: ruleofthumb.core.RoT
@@ -116,7 +150,7 @@ page]({ref}`landing page <symbol-index>`).
    :members:
 ```
 
-## Plotting
+`ruleofthumb.plot` draws everything (see [Plots](plots.md)):
 
 ```{eval-rst}
 .. automodule:: ruleofthumb.plot
@@ -152,6 +186,10 @@ page]({ref}`landing page <symbol-index>`).
 
 ```{eval-rst}
 .. autofunction:: ruleofthumb.plot.saliency
+```
+
+```{eval-rst}
+.. autofunction:: ruleofthumb.plot.reveal
 ```
 
 ```{eval-rst}

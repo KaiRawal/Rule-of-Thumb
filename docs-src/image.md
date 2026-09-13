@@ -1,105 +1,49 @@
-# Image guide
+# Images
 
-Inputs are `(N, channels, height, width)` tensors; importance is shared
-across spatial locations (see [Capacity](capacity.md) for what that
-implies). Mixed-size batches are supported two ways.
-
-## Padded batches (explainer facade)
-
-```python
-import numpy as np
-import torch
-import ruleofthumb as rot
-from ruleofthumb.image import pad_images
-
-images = [np.random.rand(3, h, w).astype(np.float32) for h, w in [(32, 32), (28, 40)]]
-labels = torch.randint(0, 2, (2,))
-
-x, mask = pad_images(images)                          # x: (2, 3, 32, 40); mask: (2, 32, 40)
-exp = rot.fit_image(y_outputs=labels, x_inputs=x.numpy(), mask=mask.numpy())
-imp = exp.get_explanation(x.numpy(), mask=mask.numpy())  # signed, shape [N, H, W]
-```
-
-## Per-sample loop (raw model)
-
-Weights are size-agnostic, so unpadded samples can be handled one at a time
-with no mask:
-
-```python
-from ruleofthumb.image import RoTImage
-
-model = RoTImage(classes=2, sample_shape=(3,))
-model.fit(torch.from_numpy(x), labels, epochs=50, batch_size=2, lr=0.01, mask=mask)
-for img in images:
-    single_imp = model.importance(torch.from_numpy(img[None]))
-```
-
-Note the two importance conventions: the raw model returns per-element
-importances of shape `(N, K, C, H, W)` (batch, classes, channels, height,
-width), while `Explainer.get_explanation` reduces over classes and channels
-to per-pixel saliency of shape `(N, H, W)` (or `(N, K, H, W)` multiclass).
-
-## Image files
-
-Pass paths straight in — `fit_image` decodes them (RGB, `[0, 1]` floats),
-derives validity masks automatically, and every explainer method accepts
-the same paths back:
+Pictures in, one importance number per pixel out. Start from file
+paths — decoding, padding, and masks are handled for you:
 
 ```python
 import ruleofthumb as rot
 
 paths = ["cat.jpg", "dog.jpg"]
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths)               # native sizes, padded
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths, size=(64, 64))  # resize + centre-crop
-imp = exp.get_explanation(paths)   # signed, shape [N, H, W]
+exp = rot.fit_image(y_answers, paths)
+imp = exp.get_explanation(paths)  # [N, H, W], signed, on the map grid
 ```
 
-Need custom preprocessing (e.g. ImageNet normalisation for a torchvision
-black box)? Supply `transform=` (a PIL Image → tensor callable), or use
-`rot.load_images(paths, ...)` directly to inspect `.images` /
-`.mask`.
+Paths are embedded through a frozen backbone (`mobilenet_v3_small`)
+by default. Prefer that: raw pixels pool down to ink mass and cap
+accuracy on anything but the simplest tasks (see [Limits](capacity.md)).
+Pass `backbone=None` for raw pixels, or a torch module for a custom
+trunk. The choice is recorded on the explainer and in save files.
 
-## Default backbone
+Need custom preprocessing (e.g. ImageNet normalisation)? Supply
+`transform=` (a PIL image → tensor callable), or inspect the pieces
+with `rot.load_images` / `rot.embed_images` directly.
 
-File paths embed through a frozen backbone by default
-(`mobilenet_v3_small`, weights download once into the torchvision cache) —
-pass `backbone=None` for raw RGB pixels instead:
+## Power mode: arrays and masks
+
+Mixed-size pictures batch with `pad_images`:
 
 ```python
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths)                 # 576-channel maps
-exp = rot.fit_image(y_outputs=labels, x_inputs=paths, backbone=None)  # raw pixels
+from ruleofthumb.image import pad_images
+
+x, mask = pad_images(images)  # [N, C, H, W], [N, H, W] True = real
+exp = rot.fit_image(y_answers, x.numpy(), mask=mask.numpy())
+imp = exp.get_explanation(x.numpy(), mask=mask.numpy())  # [N, H, W]
 ```
 
-Prefer maps: raw pixels pool to per-channel ink mass, which caps fidelity
-on focal tasks (0.61 on real pathology vs 0.95 on backbone maps — see
-[Capacity](capacity.md)). A torch module supplies a custom trunk (it
-receives ImageNet-normalised RGB); `transform=` cannot be combined with a
-backbone. Use `rot.embed_images(paths, ...)` directly to inspect `.maps` /
-`.mask`. The backbone id is recorded in `explainer.backbone` and the save
-file; reloaded explainers consume map arrays.
+Image orders keep the spatial layout `[N, H, W]` (flat pixel indices,
+`-1` = filler). One reveal step covers a whole **pixel** (its channels
+go together).
 
-## Reveal pipeline
+## Draw it
 
-One reveal step covers a whole **pixel** (channels revealed together);
-`granularity="element"` restores per-element curves. Unlike tabular
-(`(N, D)`) and text (`(N, T)`), the image order preserves the spatial layout
-`(N, H, W)`: entries are flat pixel indices into the `H × W` grid, with
-padded pixels reported as `-1` in place. Count a sample's padding with
-`(order[i] == -1).sum() == H*W - h_i*w_i`. Details:
-{ref}`Workflows: reveal curves <reveal-curves>`.
+```python
+fig = plot.saliency(imp[0], image=rgb_array)  # red toward, blue against
+```
 
-## Worked notebook
-
-The executed hello-world is
-`notebooks/03_image_quickstart.ipynb` (generated copy of
-`examples/03_image_quickstart.ipynb`, re-executed on every site build).
-The human-annotation benchmark is
-`notebooks/05_salicon.ipynb` (generated copy of
-`examples/05_salicon.ipynb`): MIT1003 fixation boxes, IG/occlusion
-baselines and a contact sheet.
-
-## Next steps
-
-- Saliency overlays: {ref}`Workflows: plotting <plotting>`.
-- Prefer rich channel representations (e.g. MobileNet feature maps) —
-  [Capacity](capacity.md) shows why raw pixels cap fidelity.
+More: [Plots](plots.md). The gentle hello-world is the
+[Shapes demo](notebooks/06_shapes_demo.ipynb) — circles on blank
+backgrounds, no downloads. [Image demo](notebooks/03_image_quickstart.ipynb)
+covers raw arrays; [Gaze](notebooks/05_salicon.ipynb) is advanced reading.

@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Test-suite report
 
 The full report is maintained at `tests/TEST_SUITE.md` and included here
