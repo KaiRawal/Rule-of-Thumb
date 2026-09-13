@@ -1,8 +1,77 @@
+:root {
+  --pst-color-primary: #d62728;
+  --pst-color-secondary: #1f77b4;
+  --pst-color-accent: #ff7f0e;
+}
+
+html[data-theme="light"] {
+  --pst-color-primary: #d62728;
+  --pst-color-secondary: #1f77b4;
+}
+
+html[data-theme="dark"] {
+  --pst-color-primary: #e85a5a;
+  --pst-color-secondary: #4a9ad6;
+}
+
 .rot-hero {
   border-left: 4px solid var(--pst-color-primary);
-  padding-left: 1rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, rgba(31,119,180,0.07), rgba(214,39,40,0.07));
+  border-radius: 0.5rem;
+  margin: 1rem 0 1.5rem 0;
+}
+
+.rot-hero h1 {
+  margin-top: 0;
+}
+
+.rot-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.rot-card {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.6rem;
+  padding: 0.9rem 1rem;
+  background: var(--pst-color-surface);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.rot-card:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.rot-card h3 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1rem;
+}
+
+.rot-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--pst-color-text-muted);
 }
 
 .bd-sidebar .toctree-caption {
   margin-top: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.version-banner {
+  border: 1px solid var(--pst-color-border);
+  border-left: 4px solid var(--pst-color-secondary);
+  background: var(--pst-color-surface);
+  border-radius: 0.4rem;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  font-size: 0.92rem;
 }

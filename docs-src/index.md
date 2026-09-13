@@ -10,6 +10,10 @@
 > changes are expected before any 1.0. Verify explanations before trusting
 > them.
 
+:::{note}
+**Docs versions:** `stable` at `/en/stable/` matches the latest PyPI release (`pip install ruleofthumb-rot`); `latest` at `/en/latest/` tracks `main` and may describe unreleased APIs — install it from source (`pip install git+https://github.com/KaiRawal/Rule-of-Thumb.git` or `pip install .` from a clone). Use the version flyout (lower-right) to switch. The badge above reports the PyPI (`stable`) version.
+:::
+
 Explaining AI systems using partial information — a pip-installable
 library consolidating the Rule of Thumb (RoT) explainer into one package.
 
@@ -22,16 +26,46 @@ observations of a black-box model's behaviour, producing per-feature
 importances that can be revealed incrementally (most-important-first)
 while preserving the black box's predictions.
 
+<div class="rot-gallery">
+
+<div class="rot-card">
+
+**Tabular** — vector inputs, one weight per feature — `fit_tabular` / `RoT`.
+
+</div>
+
+<div class="rot-card">
+
+**Text** — token-by-embedding with masks — `fit_text` / `RoTText`.
+
+</div>
+
+<div class="rot-card">
+
+**Images** — feature-map importance across pixels — `fit_image` / `RoTImage`.
+
+</div>
+
+</div>
+
 ## Install
 
 Requires Python >= 3.9. The base install is minimal (`numpy` + `torch`);
 modality extras pull only what you need:
 
+**Stable (from PyPI):**
 ```bash
 pip install ruleofthumb-rot
 pip install "ruleofthumb-rot[text]"    # transformers (raw-string ingestion)
 pip install "ruleofthumb-rot[image]"   # torchvision, Pillow, captum (image files/backbones)
 pip install "ruleofthumb-rot[plot]"    # matplotlib, wordcloud, shap, shap-editorial
+```
+
+**Latest (unreleased, from source):**
+```bash
+pip install git+https://github.com/KaiRawal/Rule-of-Thumb.git
+# or from a clone:
+pip install .                          # add [text,image,plot] as needed
 ```
 
 From source (this repo's root):

@@ -16,7 +16,7 @@ library consolidating the Rule of Thumb (RoT) explainer into one package.
 - 📄 Paper: https://arxiv.org/abs/2608.10766
 - 🌐 Project website: https://kairawal.github.io/Rule-of-Thumb-Explaining-Artificial-Intelligence-Systems-using-Partial-Information/website/
 - 🔬 Research code: https://github.com/KaiRawal/Rule-of-Thumb-Explaining-Artificial-Intelligence-Systems-using-Partial-Information
-- 📚 Documentation: https://rule-of-thumb.readthedocs.io/
+- 📚 Documentation: https://rule-of-thumb.readthedocs.io/ — `stable` ([latest PyPI release](https://pypi.org/project/ruleofthumb-rot/)) at `/en/stable/`, `latest` (unreleased `main`, source-only) at `/en/latest/` — switch via the flyout lower-right.
 
 RoT trains a simple, transparent surrogate ("rule of thumb") on partial
 observations of a black-box model's behaviour. The surrogate attributes the
@@ -82,7 +82,7 @@ pytest
 
 Full contributor guide (checks, CI, releasing):
 `docs-src/development.md`, rendered at
-https://rule-of-thumb.readthedocs.io/en/latest/development.html.
+https://rule-of-thumb.readthedocs.io/ (stable `/en/stable/development.html`, latest `/en/latest/development.html`).
 
 To build the docs site locally (from the repo root, one command — stages
 the `examples/` notebooks under `docs-src/notebooks/` (gitignored),
@@ -473,9 +473,13 @@ custom callable over the binary counts `(tp, fp, fn, tn)`.
 See `ToDo.md` for the full list and `tests/test_masks.py` for pinned
 behaviour.
 
+## Versions
+
+`stable` at `/en/stable/` matches the latest PyPI release (`pip install ruleofthumb-rot`); `latest` at `/en/latest/` tracks `main` and may describe unreleased APIs — install it from source (`pip install git+https://github.com/KaiRawal/Rule-of-Thumb.git` or `pip install .` from a clone). Use the version flyout (lower-right) to switch.
+
 ## Status
 
-v0.0.1 is the first public pre-alpha: a vibe-coded consolidation of the
+v0.0.2 is the current pre-alpha: a vibe-coded consolidation of the
 original experiment code, published to reserve the PyPI name
 (`ruleofthumb-rot`) and invite
 early feedback. Expect breakage and backwards-incompatible changes before

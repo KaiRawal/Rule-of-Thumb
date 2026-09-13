@@ -46,14 +46,46 @@ html_theme = "pydata_sphinx_theme"
 html_title = "ruleofthumb"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
-html_logo = "_static/logo.svg"
 html_favicon = "_static/favicon.ico"
 html_theme_options = {
     "github_url": "https://github.com/KaiRawal/Rule-of-Thumb",
     "use_edit_page_button": True,
     "show_toc_level": 2,
     "navigation_with_keys": True,
+    "show_nav_level": 2,
+    "navigation_depth": 4,
+    "collapse_navigation": True,
+    "navbar_align": "left",
+    "show_prev_next": True,
+    "back_to_top_button": True,
+    "search_as_you_type": True,
+    "pygments_light_style": "a11y-high-contrast-light",
+    "pygments_dark_style": "a11y-high-contrast-dark",
     "announcement": "⚠️ Experimental 0.0.x pre-alpha — expect breaking changes before 1.0.",
+    "show_version_warning_banner": True,
+    "logo": {
+        "image_light": "_static/logo.svg",
+        "image_dark": "_static/logo-dark.svg",
+        "text": "ruleofthumb",
+    },
+    "icon_links": [
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/ruleofthumb-rot/",
+            "icon": "fa-solid fa-box",
+            "type": "fontawesome",
+        },
+        {
+            "name": "Paper",
+            "url": "https://arxiv.org/abs/2608.10766",
+            "icon": "fa-solid fa-file-lines",
+            "type": "fontawesome",
+        },
+    ],
+    "footer_start": ["copyright", "sphinx-version"],
+    "footer_end": ["theme-version"],
+    "secondary_sidebar_items": ["page-toc", "edit-this-page", "sourcelink"],
+    "header_links_before_dropdown": 4,
 }
 html_context = {
     "github_user": "KaiRawal",

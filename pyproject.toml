@@ -32,7 +32,7 @@ dependencies = [
 Homepage = "https://github.com/KaiRawal/Rule-of-Thumb"
 Repository = "https://github.com/KaiRawal/Rule-of-Thumb"
 Issues = "https://github.com/KaiRawal/Rule-of-Thumb/issues"
-Documentation = "https://ruleofthumb.readthedocs.io/"
+Documentation = "https://rule-of-thumb.readthedocs.io/"
 
 [project.optional-dependencies]
 text = [
