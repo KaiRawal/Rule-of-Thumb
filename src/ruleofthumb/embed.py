@@ -51,7 +51,10 @@ def _resolve_tokenizer_model(tokenizer, model, model_name, revision):
         raise ValueError("pass both tokenizer= and model=, or neither")
     if tokenizer is not None:
         return tokenizer, model
-    from transformers import AutoModel, AutoTokenizer
+    try:
+        from transformers import AutoModel, AutoTokenizer
+    except ImportError as _exc:
+        raise ImportError("embed_texts needs transformers: pip install ruleofthumb-rot[text]") from _exc
 
     return (
         AutoTokenizer.from_pretrained(model_name, revision=revision),

@@ -43,7 +43,7 @@ execution cache, validates links; output goes to a throwaway dir, nothing
 is committed):
 
 ```bash
-.venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site
+.venv/bin/pip install -e ".[docs,text,image,plot]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site
 ```
 
 ## 2. Dry run: TestPyPI (automatic on every `main` push)
@@ -114,7 +114,7 @@ RTD builds PR previews.
 Local preview (same one-command build as §1, then serve the output):
 
 ```bash
-.venv/bin/pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site && .venv/bin/python -m http.server -d /tmp/rot-site 8000
+.venv/bin/pip install -e ".[docs,text,image,plot]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && .venv/bin/sphinx-build -W docs-src /tmp/rot-site && .venv/bin/python -m http.server -d /tmp/rot-site 8000
 ```
 
 Notes:
@@ -177,4 +177,4 @@ instead of pytest; then confirm the RTD `latest` build for the push.
 | `sphinx-build -W` warnings as errors | Fix the flagged link/docstring, don't drop `-W`. |
 | Stale notebook outputs in the site | Clear the execution cache (`rm -rf .jupyter_cache`) and rebuild; changed notebooks re-run automatically. |
 | RTD build fails | Check `.readthedocs.yaml` (Python version, requirements path); reproduce locally with the §1 command; RTD needs `requirements.txt` to install cleanly on Ubuntu. |
-| Heavy install (`torch`, `transformers`, `shap`) surprises users | Known single-install decision (AGENTS.md); point to README install notes. |
+| Heavy install (`torch`, `transformers`, `shap`) surprises users | Base is `numpy` + `torch` only; modality backends are `text` / `image` / `plot` extras (AGENTS.md) — point to README install notes. |

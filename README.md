@@ -39,12 +39,26 @@ factories return a fitted `Explainer`.
 
 ## Install
 
-Requires Python >= 3.9. A single install ships everything (core + plotting +
-LLM/vision helpers):
+Requires Python >= 3.9. The base install is minimal (tabular + numeric
+text/image arrays, which need only `numpy` + `torch`):
 
 ```bash
 pip install ruleofthumb-rot
 ```
+
+Modality extras pull only what you need:
+
+```bash
+pip install "ruleofthumb-rot[text]"    # transformers (raw-string ingestion)
+pip install "ruleofthumb-rot[image]"   # torchvision, Pillow, captum (image files/backbones)
+pip install "ruleofthumb-rot[plot]"    # matplotlib, wordcloud, shap, shap-editorial
+pip install "ruleofthumb-rot[text,image,plot]"  # everything
+```
+
+> **Migration note:** `pip install ruleofthumb-rot` no longer ships
+> text/image/plot backends — installs that relied on the old single
+> bundle should add `[text,image,plot]`. The unused `seaborn`
+> dependency is dropped outright.
 
 Code imports the package as `ruleofthumb` (conventionally `import
 ruleofthumb as rot`); only the distribution name carries the `-rot`
@@ -62,7 +76,7 @@ For local development:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,text,image,plot]"
 pytest
 ```
 
@@ -76,7 +90,7 @@ re-executes them, and validates links; output goes to a temp dir, nothing
 is committed):
 
 ```bash
-pip install -e ".[docs]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && sphinx-build -W docs-src /tmp/rot-site
+pip install -e ".[docs,text,image,plot]" && mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/ && sphinx-build -W docs-src /tmp/rot-site
 ```
 
 ## Usage

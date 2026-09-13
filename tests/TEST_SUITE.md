@@ -13,8 +13,8 @@ All numbers below were measured on this machine; yours will vary.
 - Hardware: Apple M4 Pro (ARM64, Darwin 24.5.0), 25.7 GB RAM
 - Python: 3.10.0 in `.venv` (editable install + `[dev]`)
 - Pinned libraries (`requirements.txt`, matches `.venv` exactly):
-  `numpy==2.2.6`, `torch==2.13.0`, `torchvision==0.28.0`,
-  `transformers==5.15.1`, `matplotlib==3.10.9`, `seaborn==0.13.2`,
+  `numpy==2.2.6`, `torch==2.13.0` (base), `torchvision==0.28.0`,
+  `transformers==5.15.1`, `matplotlib==3.10.9`,
   `wordcloud==1.9.6`, `pillow==12.3.0`, `shap==0.49.1`,
   `scikit-learn==1.7.2`, `pandas==2.3.3`, `pytest==9.1.1`, `ruff==0.16.4`
 - HF/torchvision weights resolve pinned revisions (`ModernBERT`
@@ -34,17 +34,17 @@ timeout 600 .venv/bin/python -m ruff check .
 
 The suite writes only gitignored caches.
 
-## 3. Suite summary (240 tests)
+## 3. Suite summary (243 tests)
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 13 files | 166 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 14 files | 169 | Synthetic tensors/arrays, no artifacts |
 | Integration `tests/integration/` | 12 files | 72 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU (HX/Salicon weights committed, rebuilt without refit) |
 
-Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_faithfulness 3,
+Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_extras 3, test_faithfulness 3,
 test_image 19, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
 test_text 14, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, hx 6, image 13, nonlinear 1, persistence 4,
-plot 7, sal 6, tabular 6, tabular_models 11, text 10, tune 3. Total 240.
+plot 7, sal 6, tabular 6, tabular_models 11, text 10, tune 3. Total 243.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -182,7 +182,7 @@ Slowest 5, cold run (rest match warm within ~1s):
 7.49 text native-string end-to-end,
 6.22 plot text native-string pipeline.
 
-## 7. Exhaustive test table (all 240)
+## 7. Exhaustive test table (all 243)
 
 “Pins” = structural/behavioural assertion, no numeric floor. Fit params per §3
 unless noted.
@@ -422,3 +422,10 @@ Pins for the image backbone path: stub-trunk map shapes + pooled mask
 counts; stub fit end-to-end with `backbone` provenance `None`;
 `backbone=None` pixel parity; backbone+transform conflict; save/load
 backbone-id round-trip.
+
+### `tests/test_extras.py` (3)
+
+Pins for the extras split: base `dependencies` are `numpy` + `torch`
+only with no `seaborn`; `text` / `image` / `plot` extras cover their
+backends; missing `matplotlib` fails with the `ruleofthumb-rot[plot]`
+hint.

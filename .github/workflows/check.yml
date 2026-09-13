@@ -18,7 +18,7 @@ jobs:
         run: |
           python -m venv .venv
           uv pip install --python .venv/bin/python -r requirements.txt
-          uv pip install --python .venv/bin/python -e ".[dev,docs]"
+          uv pip install --python .venv/bin/python -e ".[dev,docs,text,image,plot]"
       - name: Lint
         run: .venv/bin/python -m ruff check .
       - name: Test
@@ -27,3 +27,20 @@ jobs:
         run: |
           mkdir -p docs-src/notebooks && cp examples/0*.ipynb docs-src/notebooks/
           .venv/bin/sphinx-build -W docs-src /tmp/site
+  base-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: astral-sh/setup-uv@v5
+      - name: Install base only
+        run: |
+          python -m venv .venv-base
+          uv pip install --python .venv-base/bin/python "numpy==2.2.6" "torch==2.13.0" pytest
+          uv pip install --python .venv-base/bin/python . --no-deps
+      - name: Base-only import smoke
+        run: |
+          .venv-base/bin/python -c "import ruleofthumb as rot; print(rot.__version__)"
+          .venv-base/bin/python -c "import numpy as np, ruleofthumb as rot; x=np.random.rand(32,4).astype('float32'); y=(x[:,0]>0.5).astype('int64'); print(rot.fit_tabular(y,x,epochs=2).get_explanation(x).shape)"

@@ -1,22 +1,27 @@
 # Development / runtime environment for the ruleofthumb package.
-# Modern-stack pins as tested on this branch (install from this directory:
-#   pip install -r requirements.txt && pip install -e ".[dev]")
+# Install from this directory:
+#   pip install -r requirements.txt && pip install -e ".[dev]"
 #
 # NOTE: inputs must be rectangular batches; see ToDo.md for the
 # mixed-length limitation preserved from the original research code.
 
-# runtime (single install — everything ships with the package)
+# base (minimal install: pip install ruleofthumb-rot)
 numpy==2.2.6
 torch==2.13.0
-torchvision==0.28.0
+
+# text extra (pip install ruleofthumb-rot[text])
 transformers==5.15.1
-matplotlib==3.10.9
-seaborn==0.13.2
-wordcloud==1.9.6
+
+# image extra (pip install ruleofthumb-rot[image])
+torchvision==0.28.0
 pillow==12.3.0
+captum==0.9.0
+
+# plot extra (pip install ruleofthumb-rot[plot])
+matplotlib==3.10.9
+wordcloud==1.9.6
 shap==0.49.1
 shap-editorial==0.1.2
-captum==0.9.0
 
 # dev tooling (integration tests only — never imported by the package)
 scikit-learn==1.7.2

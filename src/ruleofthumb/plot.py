@@ -28,9 +28,14 @@ from __future__ import annotations
 import html as _html
 from typing import Any
 
-import matplotlib.colors
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.colors
+    import matplotlib.pyplot as plt
+except ImportError as _exc:
+    raise ImportError("ruleofthumb.plot needs matplotlib: pip install ruleofthumb-rot[plot]") from _exc
 import numpy as np
+
+_PLOT_EXTRA = "pip install ruleofthumb-rot[plot]"
 
 
 def _values_and_base(explainer, x, class_idx):
@@ -56,7 +61,10 @@ def _feature_data(x):
 
 
 def _shap_explanation(values, base, data=None, feature_names=None):
-    import shap
+    try:
+        import shap
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs shap: {_PLOT_EXTRA}") from _exc
 
     kwargs = {"values": values, "base_values": base}
     if data is not None:
@@ -75,7 +83,10 @@ def _current_figure():
 
 def waterfall(explainer, x, *, feature_names=None, max_display=10, class_idx=1):
     """SHAP-style waterfall plot of one sample's RoT explanation."""
-    import shap
+    try:
+        import shap
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs shap: {_PLOT_EXTRA}") from _exc
 
     values, base = _values_and_base(explainer, x, class_idx)
     explanation = _shap_explanation(values, base, data=_feature_data(x), feature_names=feature_names)
@@ -85,7 +96,10 @@ def waterfall(explainer, x, *, feature_names=None, max_display=10, class_idx=1):
 
 def force(explainer, x, *, feature_names=None, class_idx=1):
     """SHAP-style force plot of one sample's RoT explanation."""
-    import shap
+    try:
+        import shap
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs shap: {_PLOT_EXTRA}") from _exc
 
     values, base = _values_and_base(explainer, x, class_idx)
     explanation = _shap_explanation(values, base, data=_feature_data(x), feature_names=feature_names)
@@ -95,7 +109,10 @@ def force(explainer, x, *, feature_names=None, class_idx=1):
 
 def decision(explainer, x, *, feature_names=None, class_idx=1):
     """SHAP-style decision plot of one sample's RoT explanation."""
-    import shap
+    try:
+        import shap
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs shap: {_PLOT_EXTRA}") from _exc
 
     values, base = _values_and_base(explainer, x, class_idx)
     shap.plots.decision(base, values, feature_names=feature_names, show=False)
@@ -104,7 +121,10 @@ def decision(explainer, x, *, feature_names=None, class_idx=1):
 
 def bar(explainer, x, *, feature_names=None, max_display=10, class_idx=1):
     """SHAP-style bar plot of mean absolute importances over a batch."""
-    import shap
+    try:
+        import shap
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs shap: {_PLOT_EXTRA}") from _exc
 
     importances = explainer.get_explanation(x)
     values = importances[:, class_idx] if importances.ndim >= 3 else importances
@@ -117,7 +137,10 @@ def bar(explainer, x, *, feature_names=None, max_display=10, class_idx=1):
 
 def beeswarm(explainer, x, *, feature_names=None, max_display=10, class_idx=1):
     """SHAP-style beeswarm plot of a batch's importances against feature values."""
-    import shap
+    try:
+        import shap
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs shap: {_PLOT_EXTRA}") from _exc
 
     importances = explainer.get_explanation(x)
     values = importances[:, class_idx] if importances.ndim >= 3 else importances
@@ -267,7 +290,10 @@ def word_clouds(importance_rows, tokens_lists, *, stopwords=None, width=800, hei
     colours for consistency with the rest of the module. One-sided
     importances render fine: the empty panel shows a "no tokens" label.
     """
-    from wordcloud import STOPWORDS, WordCloud
+    try:
+        from wordcloud import STOPWORDS, WordCloud
+    except ImportError as _exc:
+        raise ImportError(f"ruleofthumb.plot needs wordcloud: {_PLOT_EXTRA}") from _exc
 
     totals, counts = {}, {}
     for row, tokens in zip(importance_rows, tokens_lists):

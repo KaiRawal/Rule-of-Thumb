@@ -26,15 +26,6 @@ classifiers = [
 dependencies = [
     "numpy>=1.21",
     "torch>=1.13",
-    "torchvision>=0.14",
-    "transformers>=4.30",
-    "matplotlib>=3.5",
-    "seaborn>=0.12",
-    "wordcloud>=1.9",
-    "Pillow>=9.0",
-    "shap>=0.45",
-    "shap-editorial>=0.1.2",
-    "captum>=0.7",
 ]
 
 [project.urls]
@@ -44,6 +35,20 @@ Issues = "https://github.com/KaiRawal/Rule-of-Thumb/issues"
 Documentation = "https://ruleofthumb.readthedocs.io/"
 
 [project.optional-dependencies]
+text = [
+    "transformers>=4.30",
+]
+image = [
+    "torchvision>=0.14",
+    "Pillow>=9.0",
+    "captum>=0.7",
+]
+plot = [
+    "matplotlib>=3.5",
+    "wordcloud>=1.9",
+    "shap>=0.45",
+    "shap-editorial>=0.1.2",
+]
 dev = [
     "pytest>=7.0",
     "ruff>=0.4",

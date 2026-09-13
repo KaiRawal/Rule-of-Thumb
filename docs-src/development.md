@@ -11,11 +11,12 @@ Requires Python 3.10 and `uv`:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 uv pip install --python .venv/bin/python -r requirements.txt
-uv pip install --python .venv/bin/python -e ".[dev,docs]"
+uv pip install --python .venv/bin/python -e ".[dev,docs,text,image,plot]"
 ```
 
-`requirements.txt` pins the exact tested environment; `pyproject.toml`
-carries only lower bounds. All commands below run from the repo root
+`requirements.txt` pins the exact tested environment with per-extra
+section headers; `pyproject.toml` carries only lower bounds (minimal
+base `numpy` + `torch`, plus `text` / `image` / `plot` extras). All commands below run from the repo root
 with `.venv` active (or prefixed `.venv/bin/`).
 
 ## Everyday checks

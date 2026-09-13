@@ -59,7 +59,10 @@ def load_images(
         :class:`ImageBatch` with float32 RGB images scaled to ``[0, 1]``
         (unless ``transform`` replaces the scaling).
     """
-    from PIL import Image
+    try:
+        from PIL import Image
+    except ImportError as _exc:
+        raise ImportError("image file paths need Pillow: pip install ruleofthumb-rot[image]") from _exc
 
     if len(paths) == 0:
         raise ValueError("paths must be non-empty")
@@ -87,7 +90,10 @@ def load_images(
 
 def _resize_and_crop(pil, size):
     """Resize the shorter edge to ``size`` and centre-crop to ``(h, w)``."""
-    from torchvision.transforms import functional as tf
+    try:
+        from torchvision.transforms import functional as tf
+    except ImportError as _exc:
+        raise ImportError("image resizing needs torchvision: pip install ruleofthumb-rot[image]") from _exc
 
     height, width = int(size[0]), int(size[1])
     resized = tf.resize(pil, min(height, width))

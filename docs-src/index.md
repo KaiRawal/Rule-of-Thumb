@@ -24,11 +24,14 @@ while preserving the black box's predictions.
 
 ## Install
 
-Requires Python >= 3.9. A single install ships everything (core + plotting
-+ LLM/vision helpers):
+Requires Python >= 3.9. The base install is minimal (`numpy` + `torch`);
+modality extras pull only what you need:
 
 ```bash
 pip install ruleofthumb-rot
+pip install "ruleofthumb-rot[text]"    # transformers (raw-string ingestion)
+pip install "ruleofthumb-rot[image]"   # torchvision, Pillow, captum (image files/backbones)
+pip install "ruleofthumb-rot[plot]"    # matplotlib, wordcloud, shap, shap-editorial
 ```
 
 From source (this repo's root):
@@ -41,7 +44,7 @@ For development:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,text,image,plot]"
 pytest
 ```
 

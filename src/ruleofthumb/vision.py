@@ -47,7 +47,10 @@ def _mobilenet_v3_small_features():
     The ``IMAGENET1K_V1`` weights are pinned explicitly (never ``DEFAULT``)
     so feature maps reproduce exactly on every machine.
     """
-    from torchvision.models import MobileNet_V3_Small_Weights, mobilenet_v3_small
+    try:
+        from torchvision.models import MobileNet_V3_Small_Weights, mobilenet_v3_small
+    except ImportError as _exc:
+        raise ImportError("image backbones need torchvision: pip install ruleofthumb-rot[image]") from _exc
 
     weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1
     model = mobilenet_v3_small(weights=weights)
@@ -71,7 +74,10 @@ def _resolve_backbone(backbone):
 
 def _preprocess(pil, size):
     """Decode to ImageNet-normalised ``(C, H, W)`` tensor, honouring ``size=``."""
-    from torchvision.transforms import functional as tf
+    try:
+        from torchvision.transforms import functional as tf
+    except ImportError as _exc:
+        raise ImportError("image preprocessing needs torchvision: pip install ruleofthumb-rot[image]") from _exc
 
     if size is not None:
         height, width = int(size[0]), int(size[1])
@@ -107,7 +113,10 @@ def embed_images(
         :class:`ImageEmbeddings` with float32 maps and a boolean
         ``(N, h, w)`` validity mask pooled from the pixel grid.
     """
-    from PIL import Image
+    try:
+        from PIL import Image
+    except ImportError as _exc:
+        raise ImportError("image file paths need Pillow: pip install ruleofthumb-rot[image]") from _exc
 
     if len(paths) == 0:
         raise ValueError("paths must be non-empty")

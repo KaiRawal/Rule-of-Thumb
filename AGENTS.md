@@ -47,7 +47,7 @@ in the changelog entry.
 
 ```
 .
-├── pyproject.toml          # uv_build; single-install deps; [dev]/[docs] extras only
+├── pyproject.toml          # uv_build; minimal base + text/image/plot extras
 ├── LICENSE               # MIT licence
 ├── .gitignore
 ├── docs-src/ + conf.py     # docs source (Sphinx/MyST: guides, executed notebooks, API, test report)
@@ -98,9 +98,14 @@ regress them:
    setting.
 3. **PEP8 class names without aliases**: `RoTImage`, `RoTText`. Breaking API
    changes are acceptable pre-1.0, but each one needs a README migration note.
-4. **Single install**: all runtime dependencies live in base `dependencies`
-   (plotting, transformers, vision included); only `[dev]` exists as an
-   extra. License is SPDX `license = "MIT"`.
+4. **Minimal base + extras (was single install)**: base
+   `dependencies` are `numpy` + `torch` only; `text` (`transformers`),
+   `image` (`torchvision`, `Pillow`, `captum`), and `plot`
+   (`matplotlib`, `wordcloud`, `shap`, `shap-editorial`) are optional
+   extras alongside `[dev]`/`[docs]`. Heavy imports stay function-level
+   with `pip install ruleofthumb-rot[<extra>]` hints; only `plot.py`'s
+   `matplotlib` needs a guarded top-level import. License is SPDX
+   `license = "MIT"`.
 5. **Dead code is deleted**, not kept "for port fidelity". Removals are
    recorded in the ToDo changelog footer instead.
 6. **Known deliberate limitations** stay until their ToDo item lands:

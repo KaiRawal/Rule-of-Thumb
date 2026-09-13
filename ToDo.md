@@ -115,6 +115,17 @@ are provenance notes only; the legacy code did not move with the package.
     upstream — slice a class first, matching our per-class outputs). Ship
     with tests, a gallery demo under item 20(c), and README/docs updates.
 
+27. **Full-dataset and large-scale validation (research).** The
+    integration tier validates on slices (3000-post text slice,
+    150-subset images) because the dev machine cannot stage dense
+    full-train embeddings (~4.5 GB float32 for 15k×96×768) or finish
+    long fits quickly. Two tracks to close the gap: (1) verify the
+    human-annotation benchmarks on a large machine, using GPU/MPS and
+    threading speedups, and record the slice-vs-full deltas; (2)
+    implement out-of-core RoT training — stream batches from disk
+    (memmap chunks) through `training_loop` so fits run when the data
+    does not fit in memory at once. No implementation commitment.
+
 ## Release / maintenance
 
 18. PyPI release checklist: three-place version bump (`pyproject.toml`,
