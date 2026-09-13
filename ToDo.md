@@ -54,6 +54,15 @@ are provenance notes only; the legacy code did not move with the package.
     any saliency-as-detector guidance should require beating a center
     control by margin, or the docs must state plainly that saliency is
     not gaze prediction. No implementation commitment.
+28. **Allow non-0.5 dropout rates.** Dropout is currently a fixed method
+    constant (0.5): the constructors, factories and `autotune` search
+    space accept no `dropout_rate`, since only 0.5 keeps every partial
+    observation equally likely (uniform over reveal subsets). If the
+    method is ever generalised to biased reveal distributions, re-open
+    the parameter behind a flag and reintroduce the search dimension —
+    with reveal-curve scoring reweighted to match the sampling
+    distribution. Until then the `test_dropout_rate_is_not_tunable`
+    pin stays.
 
 ## New functionality
 
@@ -125,6 +134,15 @@ are provenance notes only; the legacy code did not move with the package.
     implement out-of-core RoT training — stream batches from disk
     (memmap chunks) through `training_loop` so fits run when the data
     does not fit in memory at once. No implementation commitment.
+29. **Keras-style fit-to-convergence training.** Searching a fixed
+    `epochs` grid is a stand-in, not a stopping rule: train until the
+    surrogate is determined to be fit — stop when surrogate-vs-blackbox
+    agreement (or validation reveal fidelity) plateaus, with a max-epoch
+    cap — and let `autotune` give up on hopeless hyperparameter
+    combinations early (successive-halving style: abandon candidates
+    whose early fidelity trails the pack instead of running every
+    candidate to completion). Cross-refs item 16 (capacity ceilings bound
+    what "fit" can mean) and item 23 (stability across minima).
 
 ## Release / maintenance
 

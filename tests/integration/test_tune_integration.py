@@ -19,7 +19,6 @@ def test_tabular_autotune_reaches_high_fidelity(tabular_binary):
         "learning_rate": [0.01, 0.05],
         "batch_size": [64, 500],
         "epochs": [150],
-        "dropout_rate": [0.1, 0.5],
         "weight_decay": [0.0],
     }
     result = autotune(y, x, modality="tabular", search="random", n_candidates=3, space=space, seed=SEED, device=TEST_DEVICE)
@@ -35,7 +34,6 @@ def test_text_autotune_reaches_sentiment_fidelity(text_sst2):
         "learning_rate": [0.03, 0.05],
         "batch_size": [500],
         "epochs": [100, 200],
-        "dropout_rate": [0.3, 0.5],
         "weight_decay": [0.0],
     }
     result = autotune(y, x, modality="text", search="random", n_candidates=3, space=space, seed=SEED, device=TEST_DEVICE)
@@ -50,7 +48,6 @@ def test_image_autotune_reaches_binary_fidelity(image_multiclass):
         "learning_rate": [0.03, 0.05],
         "batch_size": [500, 5000],
         "epochs": [150, 300],
-        "dropout_rate": [0.3, 0.5],
         "weight_decay": [0.0],
     }
     result = autotune(y, x, modality="image", search="random", n_candidates=3, space=space, seed=SEED, device=TEST_DEVICE)

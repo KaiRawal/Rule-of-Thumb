@@ -136,7 +136,8 @@ def test_device_parameter_cpu_plumbing(tabular_data):
 def test_stochastic_importance_dropout():
     torch.manual_seed(0)
     x = torch.randn(16, 3)
-    model = RoT(2, (3,), dropout_rate=0.5)
+    model = RoT(2, (3,))
+    assert model.dropout_rate == 0.5  # fixed method constant, not tunable
     imp = model.stochastic_importance(x)
     assert tuple(imp.shape) == (16, 2, 3)
 
@@ -223,7 +224,7 @@ def test_training_loop_seed_reproducibility(tabular_data):
 
     losses = []
     for _ in range(2):
-        model = RoT(2, (5,), dropout_rate=0.5)
+        model = RoT(2, (5,))
         optimiser = torch.optim.AdamW(model.parameters(), lr=0.05)
         model.training_loop(model.loss, x, y, optimiser, epochs=4, batch_size=32, seed=123)
         losses.append(model.training_loss)

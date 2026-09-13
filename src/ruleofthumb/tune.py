@@ -1,10 +1,10 @@
 """Automatic hyperparameter tuning for RoT explainers.
 
 Keras-tuner-style search over the exposed training hyperparameters
-(``learning_rate``, ``batch_size``, ``epochs``, ``dropout_rate``,
-``weight_decay``): candidates are fitted on a seeded train split, scored on
-held-out data by final-step reveal fidelity, and the winner is refit on all
-data.
+(``learning_rate``, ``batch_size``, ``epochs``, ``weight_decay``):
+candidates are fitted on a seeded train split, scored on held-out data by
+final-step reveal fidelity, and the winner is refit on all data. Dropout is
+a fixed method constant (0.5) and is never searched.
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ DEFAULT_SPACE = {
     "learning_rate": [0.003, 0.01, 0.03, 0.1],
     "batch_size": [64, 500, 2000],
     "epochs": [100, 300, 600],
-    "dropout_rate": [0.1, 0.3, 0.5],
     "weight_decay": [0.0, 0.01, 0.05],
 }
 
@@ -154,7 +153,7 @@ def autotune(
             ``len(unique(y_outputs))`` when omitted.
         **model_kwargs: forwarded to the factories for both the candidate
             fits and the final refit (e.g. ``nonlinear``, ``l1_penalty``,
-            ``dropout_rate``, ``mask``). Sample-aligned array values (a
+            ``mask``). Sample-aligned array values (a
             ``mask`` with one entry per sample) are split alongside ``x`` /
             ``y``; scalars, strings and dicts pass through whole.
 

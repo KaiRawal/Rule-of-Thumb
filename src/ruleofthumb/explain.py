@@ -283,7 +283,6 @@ class Explainer:
         config = {
             "classes": int(model.classes),
             "sample_shape": [int(s) for s in model.sample_shape],
-            "dropout_rate": float(model.dropout_rate),
             "use_BCE_loss": bool(model.use_BCE_loss),
         }
         if self._modality == "text":
@@ -347,6 +346,9 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
     modality = payload["modality"]
     config = dict(payload["config"])
     config["sample_shape"] = tuple(config["sample_shape"])
+    # Dropout is a fixed method constant (0.5); tolerate files saved before
+    # it was removed from the constructor signature.
+    config.pop("dropout_rate", None)
     backbone = config.pop("backbone", None)
     classes = {"tabular": RoT, "text": RoTText, "image": RoTImage}[modality]
     model = classes(device=device, **config)
@@ -392,7 +394,6 @@ def fit_tabular(
     epochs=500,
     batch_size=5000,
     learning_rate=0.05,
-    dropout_rate=0.5,
     pretrain_epochs=5,
     weight_decay=0.01,
     seed=None,
@@ -402,7 +403,7 @@ def fit_tabular(
 ):
     """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs."""
     labels = _check_label_range(_as_labels(y_outputs), n_classes)
-    model = RoT(n_classes, (x_inputs.shape[1],), dropout_rate=dropout_rate, device=device, nonlinear=nonlinear)
+    model = RoT(n_classes, (x_inputs.shape[1],), device=device, nonlinear=nonlinear)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
     model.fit(
         _as_float_inputs(x_inputs),
@@ -428,7 +429,6 @@ def fit_text(
     epochs=500,
     batch_size=5000,
     learning_rate=0.05,
-    dropout_rate=0.5,
     pretrain_epochs=5,
     weight_decay=0.01,
     seed=None,
@@ -467,7 +467,6 @@ def fit_text(
     rot = RoTText(
         n_classes,
         (x_inputs.shape[1], x_inputs.shape[2]),
-        dropout_rate=dropout_rate,
         l1_penalty=l1_penalty,
         device=device,
         nonlinear=nonlinear,
@@ -500,7 +499,6 @@ def fit_image(
     epochs=500,
     batch_size=5000,
     learning_rate=0.05,
-    dropout_rate=0.5,
     pretrain_epochs=5,
     weight_decay=0.01,
     seed=None,
@@ -555,7 +553,7 @@ def fit_image(
     elif mask is not None:
         mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
-    rot = RoTImage(n_classes, (x_inputs.shape[1],), dropout_rate=dropout_rate, device=device, nonlinear=nonlinear)
+    rot = RoTImage(n_classes, (x_inputs.shape[1],), device=device, nonlinear=nonlinear)
     rot.fit(
         _as_float_inputs(x_inputs),
         _check_label_range(_as_labels(y_outputs), n_classes),

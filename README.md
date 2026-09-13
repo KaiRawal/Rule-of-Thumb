@@ -222,7 +222,7 @@ black box)? Supply `transform=` (a PIL Image → tensor callable) with
 ### Automatic hyperparameter tuning
 
 `rot.autotune` searches the training hyperparameters
-(`learning_rate`, `batch_size`, `epochs`, `dropout_rate`, `weight_decay`)
+(`learning_rate`, `batch_size`, `epochs`, `weight_decay`)
 with a seeded validation split, scores candidates by held-out reveal
 fidelity, and returns the winner refit on all data:
 
@@ -238,7 +238,8 @@ result.trials       # every candidate with its validation score, best-first
 subset of the defaults. Works for all three modalities, including raw strings
 and image paths. `n_classes` is inferred from the labels; any other factory
 keyword (`nonlinear`, `l1_penalty`, `mask`, ...) is forwarded to both the
-candidate fits and the final refit.
+candidate fits and the final refit. Dropout is not searched — it is fixed
+at 0.5 by the method (every partial observation equally likely).
 
 The factory defaults (`epochs=500, batch_size=5000`) suit tiny inputs.
 Scale them to the data: small tabular batches fit anywhere, while 96px

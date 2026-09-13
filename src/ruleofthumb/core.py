@@ -59,7 +59,7 @@ def _resolve_device(device=None):
 
 
 class RoT(torch.nn.Module):
-    def __init__(self, classes, sample_shape, dropout_rate=0.5, use_BCE_loss=False, no_a_b=False, device=None, nonlinear=None):
+    def __init__(self, classes, sample_shape, use_BCE_loss=False, no_a_b=False, device=None, nonlinear=None):
         super().__init__()
         self.device = _resolve_device(device)
         if not no_a_b:
@@ -80,7 +80,9 @@ class RoT(torch.nn.Module):
             self.objective = torch.nn.CrossEntropyLoss(reduction="sum")
         else:
             self.objective = torch.nn.BCEWithLogitsLoss(reduction="sum")
-        self.dropout_rate = dropout_rate
+        # Method constant, not a hyperparameter: 0.5 keeps every partial
+        # observation equally likely (uniform over reveal subsets).
+        self.dropout_rate = 0.5
         if not no_a_b:
             self.weights = (self.a, self.b, self.g)
         self.training_loss = None

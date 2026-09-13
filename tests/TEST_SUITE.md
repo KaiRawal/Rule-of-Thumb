@@ -34,17 +34,17 @@ timeout 600 .venv/bin/python -m ruff check .
 
 The suite writes only gitignored caches.
 
-## 3. Suite summary (243 tests)
+## 3. Suite summary (249 tests)
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 14 files | 169 | Synthetic tensors/arrays, no artifacts |
-| Integration `tests/integration/` | 12 files | 72 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU (HX/Salicon weights committed, rebuilt without refit) |
+| Unit `tests/test_*.py` | 14 files | 175 | Synthetic tensors/arrays, no artifacts |
+| Integration `tests/integration/` | 12 files | 74 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU (HX/Salicon weights committed, rebuilt without refit) |
 
 Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_extras 3, test_faithfulness 3,
-test_image 19, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 19,
-test_text 14, test_tune 9, test_vision 5, device_parity 2, gpt_pet 5, hx 6, image 13, nonlinear 1, persistence 4,
-plot 7, sal 6, tabular 6, tabular_models 11, text 10, tune 3. Total 243.
+test_image 19, test_masks 14, test_nonlinear 15, test_persistence 8, test_plot 24,
+test_text 14, test_tune 10, test_vision 5, device_parity 2, gpt_pet 5, hx 6, image 13, nonlinear 1, persistence 4,
+plot 7, sal 6, tabular 6, tabular_models 11, text 10, tune 3. Total 249.
 
 Standard live-fit hyperparameters (integration RoT fits):
 tabular/image `epochs=300, batch_size=5000, learning_rate=0.05, seed=0`;
@@ -182,7 +182,7 @@ Slowest 5, cold run (rest match warm within ~1s):
 7.49 text native-string end-to-end,
 6.22 plot text native-string pipeline.
 
-## 7. Exhaustive test table (all 243)
+## 7. Exhaustive test table (all 249)
 
 “Pins” = structural/behavioural assertion, no numeric floor. Fit params per §3
 unless noted.
@@ -382,13 +382,15 @@ Pins for save/load: round-trip identical outputs (tabular/text/image);
 `mins`/`maxs` restored; `device=` on load; foreign files rejected;
 exact version-match enforcement (mismatch + missing stamp rejected).
 
-### `tests/test_plot.py` (19)
+### `tests/test_plot.py` (24)
 
 Pins for `rot.plot`: single-row figures (waterfall/force/decision);
 batch figures (bar/beeswarm); values/base use class bias; HTML sign colours;
 max-tokens truncation; matplotlib text figure; saliency with/without image;
 saliency power/trim sweep; multiclass per-class bar/waterfall;
-nonpositive power rejected; word clouds figure + single-sign panels.
+nonpositive power rejected; word clouds figure + single-sign panels;
+reveal curves (single/dict overlay, torch+list inputs, bad-label rejection,
+existing axes).
 
 ### `tests/test_calibrated.py` (4)
 
@@ -409,12 +411,15 @@ multiclass masked zeros; facade multiclass reveal counts; mask-only
 `get_order` contract; tensor≡array mask agreement; seeding; chunked
 inference ≡ dense; large-output guard warns without erroring.
 
-### `tests/test_tune.py` (9)
+### `tests/test_tune.py` (10)
 
 Pins for `autotune` on synthetic data: grid enumeration; random
 n_candidates/space respect; seeding; split sizes; search beats a bad fit;
 refit accurate on all data; multiclass `n_classes` inference + explicit
-override; model-kwarg forwarding (`nonlinear`).
+override; model-kwarg forwarding (`nonlinear`); dropout is not tunable
+(absent from every signature; spaces containing it are rejected). Floors
+recalibrated for fixed 0.5 dropout: winner ≥0.85 held-out (beats the bad
+config by ≥0.15), refit ≥0.9 full-data.
 
 ### `tests/test_vision.py` (5)
 

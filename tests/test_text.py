@@ -50,7 +50,7 @@ def test_mask_zeroes_padded_tokens(padded_text_data):
 def test_stochastic_importance_respects_mask(padded_text_data):
     torch.manual_seed(0)
     x, mask, _ = padded_text_data
-    model = RoTText(2, (x.shape[1], x.shape[2]), dropout_rate=0.5)
+    model = RoTText(2, (x.shape[1], x.shape[2]))
     imp = model.stochastic_importance(torch.from_numpy(x), mask=mask)
     assert torch.all(imp[:, :, -2:, :] == 0)
 
