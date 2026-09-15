@@ -38,9 +38,15 @@ in your code.
 ```python
 order = exp.get_order(X_torch)                    # [N, D], best first
 curve = exp.score_ordering(X_torch, y_torch, order)  # accuracy per step
+random_order = torch.argsort(torch.rand_like(X_torch.float()), dim=1)
+random_curve = exp.score_ordering(X_torch, y_torch, random_order)
+fig = plot.reveal({"RoT order": curve, "Random": random_curve})  # the ranking, drawn
 fig = plot.waterfall(exp, X[:1], feature_names=names)  # one answer
 fig = plot.bar(exp, X[:50], feature_names=names)       # whole batch
 ```
+
+Tabular plots take the fitted explainer (`exp`, `X`) rather than the
+`imp` array above — `plot.*` calls `get_explanation()` internally.
 
 The ranking and the reveal curve are covered properly under
 [Checking the ranking by revealing less](reveal.md), and the drawings

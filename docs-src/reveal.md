@@ -11,8 +11,10 @@ never the black box. Three calls tell the whole story:
 
 ```python
 order = exp.get_order(inputs)                          # best first
-preds = exp.ordered_predict(inputs, order)             # answers per step
+preds = exp.ordered_predict(inputs, order)             # answers per step (optional peek)
 curve = exp.score_ordering(inputs, answers, order)     # accuracy per step
+random_order = torch.argsort(torch.rand_like(inputs.float()), dim=-1)
+random_curve = exp.score_ordering(inputs, answers, random_order)
 ```
 
 `curve[k]` is the accuracy after uncovering the top-`k` pieces —

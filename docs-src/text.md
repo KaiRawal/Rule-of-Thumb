@@ -35,8 +35,15 @@ from ruleofthumb.text import lengths_to_mask, pad_sequences
 x, lengths = pad_sequences(sequences)               # [N, T, E]
 mask = lengths_to_mask(lengths, x.shape[1]).numpy() # [N, T], True = real
 exp = rot.fit_text(y_answers, x.numpy(), mask=mask)
-imp = exp.get_explanation(x.numpy(), mask=mask)     # [N, T]
+imp_arr = exp.get_explanation(x.numpy(), mask=mask) # [N, T]
 ```
+
+The `imp` above (string path) is what the plots below consume; the
+array-path spelling returns an equivalent `imp_arr`. Likewise the
+`order` above is drawn with `plot.reveal` exactly as in
+[Checking the ranking by revealing less](reveal.md) — see the
+[Text demo](notebooks/02_text_quickstart.ipynb) for the runnable
+version.
 
 A few rules that repay memorising: `mask=True` marks a genuine word;
 filler positions score exactly zero and rank last (as `-1` in

@@ -159,9 +159,23 @@ def test_hx_renders(hx):
     import matplotlib
 
     matplotlib.use("Agg")
+    from matplotlib.figure import Figure
+
     from ruleofthumb import plot
 
     ws, _ = hx["ev_pairs"][0]
     words = hx["data"]["full"]["test"]["texts"][hx["ev"][0]].split()
     assert plot.text_html(ws, words) is not None
     assert plot.text_matplotlib(ws, words) is not None
+    # Gallery additions in 04_hatexplain: batch clouds + reveal curves.
+    rows = [ws for ws, _ in hx["ev_pairs"][:8]]
+    toks = [hx["data"]["full"]["test"]["texts"][i].split() for i in hx["ev"][:8]]
+    assert isinstance(plot.word_clouds(rows, toks, seed=0), Figure)
+    assert isinstance(
+        plot.reveal(
+            {"delete RoT": np.array([0.1, 0.2, 0.3]), "delete random": np.array([0.05, 0.1, 0.12])},
+            xlabel="k words removed",
+            ylabel="|Dp|",
+        ),
+        Figure,
+    )

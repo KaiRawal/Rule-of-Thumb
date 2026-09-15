@@ -72,11 +72,19 @@ labels = torch.from_numpy(y_answers[:200])
 order = exp.get_order(points)
 curve = exp.score_ordering(points, labels, order)
 print(curve)  # accuracy after 0, 1, 2, ... columns revealed
+
+# Draw it against a random-column baseline:
+random_order = torch.argsort(torch.rand_like(points.float()), dim=1)
+random_curve = exp.score_ordering(points, labels, random_order)
+fig = plot.reveal({"RoT order": curve, "Random": random_curve})
 ```
 
 A ranking you can believe in reaches full accuracy after one or two
 columns. `plot.reveal` draws that story for you (see
-[Checking the ranking by revealing less](reveal.md)):
+[Checking the ranking by revealing less](reveal.md)) — the static
+illustration below shows the expected shape (pre-generated dummy
+curves in `docs-src/_figures/generate_figures.py`, not this page's
+`curve`):
 
 ```{image} _static/figures/reveal.light.png
 :class: only-light

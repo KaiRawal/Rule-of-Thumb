@@ -36,8 +36,11 @@ from ruleofthumb.image import pad_images
 
 x, mask = pad_images(images)  # [N, C, H, W], [N, H, W] True = real
 exp = rot.fit_image(y_answers, x.numpy(), mask=mask.numpy())
-imp = exp.get_explanation(x.numpy(), mask=mask.numpy())  # [N, H, W]
+imp_arr = exp.get_explanation(x.numpy(), mask=mask.numpy())  # [N, H, W]
 ```
+
+The `imp` above (paths path) is what the saliency plot below
+consumes; the array-path spelling returns an equivalent `imp_arr`.
 
 Image orders keep their spatial layout `[N, H, W]` — flat pixel
 indices, with `-1` marking filler. One reveal step always covers a

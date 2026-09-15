@@ -160,11 +160,28 @@ def test_sal_renders(sal):
     import matplotlib
 
     matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
+
     from ruleofthumb import plot
 
     fig = plot.saliency(sal["mob_sals"][0] * np.sign(sal["mob_sals"][0] - sal["mob_sals"][0].mean()),
                         image=sal["X"][sal["idx"][0]])
     assert fig is not None
+    # Gaze notebook additions: overlay grid draws into existing axes,
+    # all arms render, and reveal curves render.
+    _, axes = plt.subplots(1, 3)
+    for ax, sal_map in zip(axes, (sal["mob_sals"][0], sal["pix_sals"][0], sal["mob_sals"][1])):
+        assert isinstance(
+            plot.saliency(np.asarray(sal_map, dtype=np.float32), image=sal["X"][sal["idx"][0]], ax=ax),
+            Figure,
+        )
+    plt.close("all")
+    assert isinstance(
+        plot.reveal({"RoT order": np.array([0.5, 0.8, 1.0]), "Random": np.array([0.5, 0.55, 0.6])}),
+        Figure,
+    )
+    plt.close("all")
     try:
         plot.saliency(np.zeros((2, 3, 4, 4)))
     except ValueError as e:
