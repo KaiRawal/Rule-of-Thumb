@@ -151,7 +151,7 @@ are provenance notes only; the legacy code did not move with the package.
     implement out-of-core RoT training — stream batches from disk
     (memmap chunks) through `training_loop` so fits run when the data
     does not fit in memory at once. No implementation commitment.
-29. **Keras-style fit-to-convergence training (P1).** Searching a fixed
+29. **Keras-style fit-to-convergence training (P1; tracked under 37).** Searching a fixed
     `epochs` grid is a stand-in, not a stopping rule: train until the
     surrogate is determined to be fit — stop when surrogate-vs-blackbox
     agreement (or validation reveal fidelity) plateaus, with a max-epoch
@@ -162,7 +162,7 @@ are provenance notes only; the legacy code did not move with the package.
     what "fit" can mean) and item 23 (stability across minima).
 
 30. **Opt-in explanation evaluation (agreement, reveal gap, human-data
-    comparison) (P1).** An explicit `Explainer.evaluate(...)` reporting only
+    comparison) (P1; tracked under 37).** An explicit `Explainer.evaluate(...)` reporting only
     realised, research-backed measures: (a) **fit agreement** —
     in-sample plus a seeded held-out split, warning below 0.75
     (extends the existing `train_agreement_` tripwire rather than
@@ -228,6 +228,64 @@ are provenance notes only; the legacy code did not move with the package.
     with tests, a gallery demo under item 20(c), and README/docs
     updates. Done when the pilot renders in JupyterLab and VSCode
     (plus Colab/RTD if the chosen stack allows). Not started.
+
+36. **Monorepo replication program (research, P0).** The research
+    monorepo (parent checkout; this package is its subdirectory) holds
+    nine hand-tuned RoT experiments driven by `run_all_experiments.sh`
+    — adversarial, scientific, ai_auditing, explanation_example
+    (local + remote), openxai, resume, movie, judicial, runtimes —
+    each with headline numbers the out-of-the-box package install
+    must eventually reproduce. Out-of-the-box means `fit()` *and*
+    `autotune` (autotune is shipped, not a deviation). Protocol per
+    experiment, cheap first (Local → Scientific → OpenXAI →
+    Adversarial → Auditing → Resume → Movie → Judicial → Pets-5000):
+    (1) `fit()` defaults, record the gap; (2) `autotune`, record the
+    gap; (3) hand-set hyperparams beyond autotune's space count as
+    deviations, and each one is an autotune-space improvement ticket;
+    (4) translate legacy idioms (`-1` sentinel → explicit `mask=`,
+    unit vs element granularity, `classes=2` → real K); (5) every API
+    gap or bug found becomes package work, implemented until the
+    replication passes. Pass = headline fidelity/wAUROC within
+    ±0.02 or the paper's own error bars, whichever wider. Hard rules:
+    never re-call paid APIs (reuse committed GPT CSVs), never rerun
+    SHAP/LIME baselines (compare against committed monorepo outputs),
+    heavy legs last — and never modify the monorepo: read its DATA
+    and committed outputs only. The working log is temporary and
+    stays out of version control (`scratch/replication/`, gitignored;
+    per-experiment notes plus the status table). HX/SALICON are out
+    of scope (package-only, reverse direction, already done). Known
+    gap inventory seeding the log: bespoke hyperparams everywhere,
+    sentinel-vs-mask, `RoT_additive`/RBF only in the OpenXAI patch,
+    saliency power/trim viz missing, non-input features need manual
+    augmentation. Done when the scratch log shows all nine passing
+    with zero open gaps and every resulting package improvement is
+    shipped. Not started.
+
+37. **Tuning as the default path (P0).** Every `fit()` searches:
+    `fit`, `fit_tabular`, `fit_text`, `fit_image` gain `tune=True`
+    (`True` → delegate to `autotune()` with defaults; a dict →
+    `space` / `n_candidates` / `scoring` overrides; `None` / `False`
+    → today's fixed fit, kept as the escape hatch for tests and
+    cost-sensitive callers). Recursion guard (autotune calls
+    factories with tuning off); still returns `Explainer` with
+    `best_params_` / `best_score_` attached (`train_agreement_`
+    convention); `autotune()` keeps returning `AutotuneResult`. This
+    item absorbs the two pending tuning tracks rather than stacking a
+    third: (a) item 29's fit-to-convergence (plateau stopping with
+    max-epoch cap) and early abandonment of hopeless candidates
+    become the cost control that makes always-tuning affordable;
+    (b) item 30's `Explainer.evaluate(...)` (held-out agreement +
+    warning, opt-in reveal gap, human-data comparison) becomes the
+    scoring/verification side. Fallout handled here, not elsewhere:
+    the test suite gets explicit `tune=None` at all fixed-behavior
+    call sites (else ~8× suite cost) plus new flag/guard/attribute
+    tests; examples/docs re-executed (slower builds, changed
+    outputs); version bump + changelog + README migration note
+    (`tune=None` restores old behavior). Item 36's protocol collapses
+    to one tuned level. Done when the suite is green at the new
+    default with reported timing, docs promote `tune=True` as the
+    normal path, and 29/30's remaining scope is either shipped inside
+    this item or explicitly re-scoped. Not started.
 
 ## Release / maintenance
 
