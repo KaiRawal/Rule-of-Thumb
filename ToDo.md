@@ -16,18 +16,35 @@ are provenance notes only; the legacy code did not move with the package.
     fits in underdetermined regimes land in different minima per BLAS
     kernel, so no live-fit absolute floor is portable across hosts (seen:
     pets heatmap corr `0.36–0.52` vs `1.0`, text native accuracy `0.65`
-    vs `1.0`, digits top-2 `0.80` vs `0.92`). Convert every test that
-    needs *a* fitted model rather than *the act of* fitting to load raw
-    `.pt` state dicts (pets template: `mint_pet_weights.py`): tabular (2
-    sets), tabular-models (7), text SST-2 (1–2), image
-    (binary/10-class/coords/rich), nonlinear pair, persistence round-trips
-    (fit incidental), plot rendering (reuse sets, zero new weights). Must
-    stay live: seed-reproducibility, tune search, native-ingestion fits,
-    comparative fits. Raw `.pt`, never `.rotx` (version-stamp coupling;
-    `.rotx` stays covered by `test_image_round_trip`). One mint script,
-    one loader helper, regen discipline in `development.md`,
-    `TEST_SUITE.md` updates. Done when CI is green with no live-fit
-    absolute floors outside the must-live set.
+    vs `1.0`, digits top-2 `0.80` vs `0.92`). Direction (decided): the
+    testing pyramid splits by *what is asserted*, not by tier. Unit tests
+    that assert on the *outputs* of a pre-fit RoT (explanations, plots,
+    persistence round-trips, mechanism recovery) load raw `.pt` state
+    dicts as mock fitted models and assert tight margins; integration
+    tests keep fitting live end-to-end with honest loose floors plus
+    structural checks, hardened by bigger-N artifacts and proxy-ensemble
+    floor setting (see below). Converted unit sets (`tests/fixtures/`,
+    minted by `tests/mint_unit_weights.py`, loaded via
+    `tests/_mock_weights.py`): plot rendering (tabular binary +
+    multiclass), persistence round-trips (tabular/text/image, fit
+    incidental), calibrated mechanism recovery (binary + multiclass),
+    faithfulness probes (deletion/pointing/noise), nonlinear ring
+    separation (linear + rbf + hinge). Must stay live everywhere:
+    seed-reproducibility, tune search, native-ingestion fits, comparative
+    fits (including the linear-vs-rbf integration pair). Raw `.pt`, never
+    `.rotx` (version-stamp coupling; `.rotx` stays covered by the
+    round-trip tests). Dataset builders are single-sourced in the loader
+    so mint fits and test inputs cannot drift. Integration hardening, in
+    order: (1) determinism (`torch.use_deterministic_algorithms` where
+    ops allow, batch-order pinning, residual-BLAS note in
+    `development.md`); (2) bigger-N artifacts (digits tabular 500→1797,
+    COMPAS 800→2000, reviews 31→~60 hand-written, image digits 500→1000+;
+    breast-cancer/wine are full-size already); (3) proxy-ensemble floor
+    setting (seeds × threads × device, floors at ensemble minimum minus
+    margin, recorded in `TEST_SUITE.md`). Regen discipline in
+    `development.md`, `TEST_SUITE.md` updates. Done when CI is green with
+    tight unit margins on mocks and measured ensemble-backed floors on
+    live integration fits.
 
 23. **RoT stability across hardware (research, P2).** The suite has proven the
     method property behind item 22: long fits in underdetermined regimes

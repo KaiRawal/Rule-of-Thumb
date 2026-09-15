@@ -38,7 +38,7 @@ def test_binary_explanation_shape_additivity_and_fidelity(tabular_binary):
     # fidelity: the surrogate reproduces the black-box labels
     surrogate_predictions = exp.predict(torch.from_numpy(x)).cpu().numpy()
     accuracy = float((surrogate_predictions == y).mean())
-    assert accuracy >= 0.85  # black box itself achieves ~0.988 on this data
+    assert accuracy >= 0.95  # ensemble-backed (min 0.988 over threads×device×seed legs)
 
 
 def test_binary_top_features_match_logistic_coefficients(tabular_binary):
@@ -49,11 +49,11 @@ def test_binary_top_features_match_logistic_coefficients(tabular_binary):
     k = 8
     top_black_box = set(np.argsort(-np.abs(coef))[:k])
     top_surrogate = set(np.argsort(-np.abs(imp).mean(0))[:k])
-    assert len(top_black_box & top_surrogate) >= k // 2
+    assert len(top_black_box & top_surrogate) >= 5  # ensemble min 5 (was k // 2)
 
     # tighter anchors: the importance profile tracks the coefficient profile
-    assert len(set(np.argsort(-np.abs(coef))[:7]) & set(np.argsort(-np.abs(imp).mean(0))[:7])) >= 4
-    assert np.corrcoef(np.abs(imp).mean(0), np.abs(coef))[0, 1] >= 0.5
+    assert len(set(np.argsort(-np.abs(coef))[:7]) & set(np.argsort(-np.abs(imp).mean(0))[:7])) >= 5
+    assert np.corrcoef(np.abs(imp).mean(0), np.abs(coef))[0, 1] >= 0.55  # ensemble min 0.559
 
 
 def test_binary_reveal_curve_recovers_full_accuracy(tabular_binary):
@@ -91,7 +91,7 @@ def test_multiclass_explanation_shape_and_fidelity(tabular_multiclass):
 
     predictions = exp.predict(torch.from_numpy(x)).cpu().numpy()
     accuracy = float((predictions == y).mean())
-    assert accuracy >= 0.5  # far above the 10% chance line
+    assert accuracy >= 0.9  # ensemble min 0.968 on the full 1797-digit set
 
 
 def test_multiclass_confusion_counts_match_active_samples(tabular_multiclass):

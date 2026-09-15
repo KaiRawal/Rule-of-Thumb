@@ -18,10 +18,11 @@ from ruleofthumb import fit_tabular
 
 MODELS = ("gbm", "svc", "mlp")
 
-# floors calibrated against the committed artifacts (see manifest.json)
+# floors from the proxy ensemble (threads×device×seed legs, minima:
+# compas gbm 0.880 / svc 0.913 / mlp 0.862, wine unanimous 0.989)
 ACCURACY_FLOORS = {
-    "compas": {"gbm": 0.75, "svc": 0.85, "mlp": 0.75},
-    "wine": {"gbm": 0.9, "svc": 0.9, "mlp": 0.9},
+    "compas": {"gbm": 0.85, "svc": 0.9, "mlp": 0.84},
+    "wine": {"gbm": 0.95, "svc": 0.95, "mlp": 0.95},
 }
 
 
@@ -66,9 +67,9 @@ def test_wine_models_share_the_same_dominant_features(wine):
         exp = _fit("wine", x, wine[f"y_{model}"])
         imp = exp.get_explanation(x)
         top3[model] = set(np.argsort(-np.abs(imp).mean((0, 1)))[:3])
-    assert len(top3["gbm"] & top3["svc"]) >= 2
-    assert len(top3["gbm"] & top3["mlp"]) >= 2
-    assert len(top3["svc"] & top3["mlp"]) >= 2
+    assert len(top3["gbm"] & top3["svc"]) >= 3
+    assert len(top3["gbm"] & top3["mlp"]) >= 3
+    assert len(top3["svc"] & top3["mlp"]) >= 3  # unanimous 3/3 across ensemble legs
 
 
 @pytest.mark.parametrize("stem", ["compas", "wine"])
@@ -112,11 +113,11 @@ def test_breast_cancer_fidelity_and_rank_agreement():
     ybb_te = bb.predict(xte).astype(np.int64)
 
     exp = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, device=TEST_DEVICE)
-    assert rot_accuracy(exp, xte, ybb_te) >= 0.85
+    assert rot_accuracy(exp, xte, ybb_te) >= 0.9  # ensemble min 0.979
 
     shaped = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, device=TEST_DEVICE, nonlinear="rbf")
-    assert rot_accuracy(shaped, xte, ybb_te) >= 0.85
+    assert rot_accuracy(shaped, xte, ybb_te) >= 0.9  # ensemble min 0.951
 
     rot_scores = np.abs(exp.get_explanation(xte)).mean(0)
     perm = permutation_importance(bb, xte, yte, n_repeats=5, random_state=0)
-    assert spearmanr(rot_scores, perm.importances_mean).statistic > 0.3
+    assert spearmanr(rot_scores, perm.importances_mean).statistic > 0.5  # ensemble min 0.598

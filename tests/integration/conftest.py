@@ -43,8 +43,15 @@ def _deterministic():
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.set_num_threads(1)
+    threads = int(os.environ.get("ROT_TEST_THREADS", "1"))
+    torch.set_num_threads(threads)
     torch.set_num_interop_threads(1)
+    # Fail loudly on nondeterministic op selection: batch shuffling and
+    # dropout draws are already seeded per fit, so anything reaching for a
+    # nondeterministic kernel is a bug, not speed. Residual cross-host
+    # spread is BLAS last-ulp noise below this guard (see development.md);
+    # only overdetermined fits shrink it, never seeding.
+    torch.use_deterministic_algorithms(True)
     yield
 
 
@@ -130,15 +137,14 @@ def pet_features(pets):
 
 @pytest.fixture(scope="session")
 def digit_features_multiclass():
-    """Live MobileNetV3-Small feature maps ``(500, 576, 7, 7)`` for the digit set.
+    """Live MobileNetV3-Small feature maps ``(1797, 576, 7, 7)`` for the digit set.
 
-    The same 500 8x8 digits as ``image_multiclass`` are upscaled to RGB and
+    The same 1797 8x8 digits as ``image_multiclass`` are upscaled to RGB and
     passed through the pretrained backbone live on every run (weights from
     the local cache; nothing intermediate is committed). Labels are the
     committed TinyCNN 10-class predictions, so the RoT surrogate is still
-    the only model fitted at test time. ``N=500`` exceeds the 49 spatial
-    positions per map, keeping the shared-weight fit overdetermined.
-    """
+    the     only model fitted at test time. ``N=1797`` exceeds the 49 spatial
+    positions per map, keeping the shared-weight fit overdetermined.    """
     pytest.importorskip("torchvision")
     from PIL import Image
     from torchvision import models as tv_models

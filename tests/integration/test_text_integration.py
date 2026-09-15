@@ -103,8 +103,8 @@ def test_top_tokens_carry_sentiment_words(text_sst2):
             negative_n += 1
             negative_hits += bool(top5 & NEGATIVE_WORDS)
 
-    assert positive_hits / positive_n >= 0.4
-    assert negative_hits / negative_n >= 0.55
+    assert positive_hits / positive_n >= 0.5  # ensemble min 0.552
+    assert negative_hits / negative_n >= 0.6  # ensemble min 0.655
 
 
 def test_brilliant_outranks_awful_in_the_pair_review(text_sst2):
@@ -145,7 +145,7 @@ def test_reveal_curve_recovers_full_accuracy(text_sst2):
     # RoT predicted-class accuracy vs the transformer's labels
     full_accuracy = rot_accuracy(exp, embeddings, y)
     assert abs(float(curve[-1]) - full_accuracy) < 1e-6
-    assert full_accuracy >= 0.85
+    assert full_accuracy >= 0.95  # ensemble: 1.0 on every leg
 
 
 def test_seed_reproducibility(text_sst2):

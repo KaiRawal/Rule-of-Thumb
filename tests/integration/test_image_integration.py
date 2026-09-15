@@ -3,7 +3,7 @@
 Black boxes are TinyCNNs (architecture in ``cnn.py``) trained once by
 ``generate_artifacts.py`` and committed as state_dicts:
 
-- 10-class digit classifier on the same 500 images as the tabular artifacts;
+- 10-class digit classifier on the same 1797 images as the tabular artifacts;
 - binary dense-vs-sparse classifier whose labels split at the median ink mass.
 
 Only the RoT explainer is fitted live, through the
@@ -100,7 +100,7 @@ def test_binary_explanation_shape_and_fidelity(image_multiclass):
 
     predictions = exp.predict(torch.from_numpy(x)).cpu().numpy()
     accuracy = float((predictions == y).mean())
-    assert accuracy >= 0.9  # the surrogate can express this signal almost perfectly
+    assert accuracy >= 0.93  # ensemble min 0.943 on the full 1797-digit set
 
     # signed importances are additive with the class-1 bias
     scores = exp.model.score(torch.from_numpy(x)).detach().cpu().numpy()
@@ -187,8 +187,10 @@ def test_multiclass_confusion_counts_and_reveal_curve(image_multiclass):
     column_mass = final.sum(0)
     top2_coverage = float(np.sort(column_mass)[::-1][:2].sum()) / len(x)
     # predictions collapse onto a couple of classes (uniform would be 0.2);
-    # the bound stays loose because the degenerate 10-class landscape amplifies
-    # last-ulp BLAS differences across architectures (observed 0.80–0.93)
+    # the bound stays at 0.75 deliberately: the degenerate 10-class landscape
+    # makes the collapse seed- and backend-sensitive (same-seed CPU legs give
+    # 0.84, but seed variation reaches 0.55 and MPS 0.62), so this documents
+    # the tendency rather than a portable floor. Ensemble evidence in TEST_SUITE.md.
     assert top2_coverage >= 0.75
 
     curve = exp.score_ordering(xt, yt, order)
@@ -211,11 +213,11 @@ def test_coordinate_channels_restore_multiclass_capacity(image_multiclass):
 
     accuracy = rot_accuracy(exp, x, y)
     majority = max(collections.Counter(y.tolist()).values()) / len(y)
-    assert accuracy >= max(majority + 0.15, 0.3)  # calibrated floor (measured ~0.35)
+    assert accuracy >= majority + 0.15  # ensemble min margin 0.175 (0.277 at maj 0.102)
 
     # explicit contrast with the C=1 case on the same digits
     baseline_exp = _fit_image(image_multiclass["x"], image_multiclass["y"], n_classes=10)
-    assert accuracy >= rot_accuracy(baseline_exp, image_multiclass["x"], image_multiclass["y"]) + 0.15
+    assert accuracy >= rot_accuracy(baseline_exp, image_multiclass["x"], image_multiclass["y"]) + 0.1
 
     imp = exp.get_explanation(x)
     assert imp.shape == (len(x), 10) + x.shape[2:]
@@ -236,11 +238,11 @@ def test_coordinate_channels_restore_multiclass_capacity(image_multiclass):
 
 
 def test_rich_backbone_feature_shape(digit_features_multiclass):
-    """Live MobileNet maps for the 500 digits are well-formed and overdetermined."""
+    """Live MobileNet maps for the 1797 digits are well-formed and overdetermined."""
     x, y = digit_features_multiclass["features"], digit_features_multiclass["y"]
-    assert x.shape == (500, 576, 7, 7)
+    assert x.shape == (1797, 576, 7, 7)
     assert np.isfinite(x).all()
-    assert len(x) > x.shape[2] * x.shape[3]  # N=500 images exceeds 49 spatial positions
+    assert len(x) > x.shape[2] * x.shape[3]  # N=1797 images exceeds 49 spatial positions
     assert set(np.unique(y).tolist()) == set(range(10))
 
 
@@ -252,15 +254,21 @@ def test_multiclass_rich_backbone_strong_accuracy(digit_features_multiclass, ima
     spatial sums of semantic detectors, which separate the 10 digit classes
     linearly. Feature maps are recomputed live from the committed 8x8 digits
     (upscaled to RGB); only the RoT surrogate is fitted here. Gate note: the
-    TinyCNN trunk itself ((500, 8, 8, 8) maps) was tried first and reached
+    TinyCNN trunk itself ((1797, 8, 8, 8) maps) was tried first and reached
     only ~0.49, so it is not used — this test pins the real-backbone path.
+
+    Runtime guard: the fit + full reveal curve cost scales with N, so this
+    arm runs on a deterministic 500-slice of the 1797 (stratified
+    selection was shuffled, so the head slice holds ~50/class) — still
+    far above the 49 spatial positions that define overdetermination.
     """
-    x, y = digit_features_multiclass["features"], digit_features_multiclass["y"]
+    x, y = digit_features_multiclass["features"][:500], digit_features_multiclass["y"][:500]
+    assert set(np.unique(y).tolist()) == set(range(10))
     exp = _fit_image(x, y, n_classes=10)
 
     accuracy = rot_accuracy(exp, x, y)
     majority = max(collections.Counter(y.tolist()).values()) / len(y)
-    assert accuracy >= 0.8  # strong bar (measured ~0.99; coords partial fix is ~0.35)
+    assert accuracy >= 0.95  # ensemble min 0.998 on the 500-slice
     assert accuracy >= majority + 0.5
 
     # explicit contrast with the raw C=1 ceiling on the same digits

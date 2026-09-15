@@ -38,7 +38,7 @@ The suite writes only gitignored caches.
 
 | Tier | Files | Tests | Data |
 | --- | --- | --- | --- |
-| Unit `tests/test_*.py` | 14 files | 175 | Synthetic tensors/arrays, no artifacts |
+| Unit `tests/test_*.py` | 14 files | 175 | Synthetic tensors/arrays regenerated deterministically in-test; output-asserting files load committed mock RoT weights (§4d) instead of fitting |
 | Integration `tests/integration/` | 12 files | 74 | Committed artifacts + pinned-revision HF/MobileNet features, RoT fitted live on CPU (HX/Salicon weights committed, rebuilt without refit) |
 
 Per-file counts: test_calibrated 4, test_core 18, test_embed 15, test_explain 23, test_extras 3, test_faithfulness 3,
@@ -59,17 +59,17 @@ ingestion uses `epochs=50`: shorter fits resist cross-host amplification).
 | --- | --- | --- |
 | `tabular_binary.npz` | 64K | `x` (569,30) scaled breast-cancer features, `y` (569,) LR predictions |
 | `breast_cancer_lr.joblib` | 4K | Scaler + LogisticRegression black box |
-| `digits_tabular.npz` | 20K | `x` (500,64) flattened digits, `y` (500,) RF predictions |
+| `digits_tabular.npz` | 68K | `x` (1797,64) full digit set, `y` (1797,) RF predictions |
 | `digits_rf.joblib` | 2.3M | RandomForest black box (100 trees) |
-| `digits_image.npz` | 92K | `x_multi` (500,1,8,8), `y_multi` (500,) TinyCNN labels, `y_binary` (500,) dense-vs-sparse labels, `x_coords` (500,3,8,8), `y_coords`, `x_bin` (120,1,8,8) |
+| `digits_image.npz` | 320K | `x_multi` (1797,1,8,8), `y_multi` (1797,) TinyCNN labels, `y_binary` (1797,) dense-vs-sparse labels, `x_coords` (1797,3,8,8), `y_coords`, `x_bin` (120,1,8,8) |
 | `cnn_multiclass.pt` | 28K | TinyCNN 10-class state_dict |
 | `cnn_binary.pt` | 12K | TinyCNN binary state_dict |
 | `cnn_multiclass_coords.pt` | 28K | TinyCNN 10-class 3-channel state_dict |
-| `compas.npz` / `compas_models.joblib` | 8K / 276K | `x` (800,12), `y_gbm/y_svc/y_mlp` (800,) + GBM/SVC/MLP black boxes |
+| `compas.npz` / `compas_models.joblib` | 24K / 276K | `x` (2000,12), `y_gbm/y_svc/y_mlp` (2000,) + GBM/SVC/MLP black boxes |
 | `compas_preprocessing.joblib` | 4K | Preprocessing bundle (not loaded by tests) |
 | `wine.npz` / `wine_models.joblib` | 8K / 456K | `x` (178,13), `y_gbm/y_svc/y_mlp` (178,) + GBM/SVC/MLP black boxes |
 | `wine_preprocessing.joblib` | 4K | Preprocessing bundle (not loaded by tests) |
-| `reviews.txt` | 4K | Fixed film-review snippets, one per line |
+| `reviews.txt` | 8K | 58 fixed film-review snippets, one per line |
 | `pets_labels.csv` | 4K | 20 rows: filename, ground_truth, gpt_label |
 | `pet_images/` | 700K | 20 raw cat/dog JPEGs (10/class) |
 | `pet_reference_explanations.npz` | 4K | `heatmaps` (20,7,7) regression anchors (forward pass of `pet_rot_state.pt`) |
@@ -107,7 +107,30 @@ All §4a files + `manifest.json` (one-off, fixed seeds, deterministic reruns).
 The test suite itself writes nothing except gitignored
 `__pycache__/` and `.pytest_cache/`.
 
-## 5. Accuracy report (measured 2026-09-08, same hyperparameters as the tests)
+### 4d. Unit mock weights (committed under `tests/fixtures/`)
+
+Unit tests that assert on the *outputs* of a pre-fit RoT (ToDo item 22,
+unit-mock direction) load raw `.pt` state dicts — never `.rotx` — via
+`tests/_mock_weights.py:load_mock`, instead of fitting live. Only the
+deterministic forward pass runs at test time, so these floors are tight.
+Mint with `tests/mint_unit_weights.py` (CPU, seeded, single-threaded;
+`--check` reloads every fixture and re-verifies its margins); dataset
+builders are single-sourced in the loader so mint fits and test inputs
+cannot drift.
+
+| Fixture | Fit replicated | Tight margin asserted |
+| --- | --- | --- |
+| `plot_tabular` / `plot_tabular_multi` | 30ep binary / 8ep 3-class tabular | rendering only (figures/HTML) |
+| `persist_{tabular,text,image}` | 8ep per modality | round-trip identity (`allclose`) |
+| `calib_binary` | 200ep exact-linear mechanism | spearman `>=0.95` (measured 1.0), sign corr `>0.95`, exact top-3/argmin |
+| `calib_multi` | 200ep 3-class mechanism | exact per-class argmax |
+| `faith_deletion` | 60ep | top-2 exact `{0,1}`, deletion gap `>=0.35` (measured 0.42) |
+| `faith_pointing` | 60ep image square | hit rate `>=0.9` (measured 1.0) |
+| `faith_noise` | 100ep | signal min strictly above noise max |
+| `ring_linear` / `ring_{rbf,hinge}` | 250ep / 400ep ring | linear `<0.7` (measured 0.63), shaped `>=0.9` (0.93/0.96), margin `>=0.2` |
+
+## 5. Accuracy report (measured 2026-09-08, same hyperparameters as the tests;
+grown-artifact rows re-measured 2026-09-15 on this machine, CPU, seed 0)
 
 Definitions: **black-box-vs-truth** = black-box model vs ground-truth labels
 (where ground truth is available; COMPAS/wine store only black-box outputs by
@@ -116,22 +139,49 @@ the tests assert floors on. **Majority** = always-guess-commonest-class score.
 
 | Case | N | Black-box-vs-truth (measured) | RoT-vs-black-box (measured) | Floor asserted |
 | --- | --- | --- | --- | --- |
-| tabular breast-cancer/LR | 569 | 0.9877 | 0.9895 (maj 0.633) | `>=0.85` + coeff overlap/corr anchors |
-| tabular digits/RF (10-class) | 500 | 1.0000 | 0.9760 (maj 0.100) | `>=0.5` |
-| compas gbm / svc / mlp | 800 | n/a (outputs only) | 0.8400 / 0.9187 / 0.8075 | `>=0.75/0.85/0.75` + priors_count top |
-| wine gbm / svc / mlp (3-class) | 178 | n/a (outputs only) | 0.9944 ×3 | `>=0.9` ×3 + shared top features |
-| image binary dense-vs-sparse | 500 | n/a (median-split labels) | 0.9360 (maj 0.522) | `>=0.9` |
-| image 10-class raw C=1 | 500 | n/a (CNN outputs) | 0.1220 (maj 0.104) | `maj..maj+0.05` (must look bad) + top-2 `>=0.75` (measured 0.922; loose: the degenerate landscape amplifies last-ulp BLAS spread) |
-| image 10-class coords C=3 | 500 | n/a (CNN outputs) | 0.3240 (maj 0.104) | `>=maj+0.15` (~0.35) and `>=raw+0.15` |
-| image 10-class MobileNet rich | 500 | n/a (CNN outputs) | 0.9940 (maj 0.104) | `>=0.8`, `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
+| tabular breast-cancer/LR | 569 | 0.9877 | 0.9877 (maj 0.633) | `>=0.95` + coeff overlap/corr anchors |
+| tabular digits/RF (10-class) | 1797 | 1.0000 | 0.9694 (maj ~0.10) | `>=0.9` |
+| compas gbm / svc / mlp | 2000 | n/a (outputs only) | 0.8810 / 0.9200 / 0.8655 | `>=0.85/0.9/0.84` + priors_count top |
+| wine gbm / svc / mlp (3-class) | 178 | n/a (outputs only) | 0.9888 ×3 | `>=0.95` ×3 + shared top features |
+| image binary dense-vs-sparse | 1797 | n/a (median-split labels) | 0.9672 (maj ~0.5) | `>=0.93` |
+| image 10-class raw C=1 | 1797 | n/a (CNN outputs) | 0.1080 (maj 0.102) | `maj..maj+0.05` (must look bad) + top-2 `>=0.75` (CPU legs 0.84; seed-sensitive, see §5b) |
+| image 10-class coords C=3 | 1797 | n/a (CNN outputs) | 0.2944 (maj 0.102) | `>=maj+0.15` and `>=raw+0.1` |
+| image 10-class MobileNet rich | 500-slice | n/a (CNN outputs) | 1.0000 (maj ~0.10) | `>=0.95`, `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
 | pets GPT-vs-truth / RoT-vs-GPT | 20 | 1.0000 | 1.0000 (floor `>=0.85`; heatmap corr min `>=0.95`, mean `>=0.99`; dog-mass corr `>=0.9`) | as listed |
 | HX TF-IDF/logreg box, RoT-text | 1924 | 0.7588 | 0.7646 | `>=0.72`; wAUROC 0.7056 (`>=0.65`); SHAP parity ±0.08; deletion wins +0.02 and insertion wins at k=3,10 (n=200); target slices smoke |
-| MIT1003 ResNet18, RoT-maps/pixel | 150 | n/a (API outputs) | maps 0.9533 / pixel 0.1867 | maps `>=0.90`, pixel `<=0.30` (documented collapse); pointing mob 0.34 `>=0.28`, mob > pixel, rand `<=0.15`; box-IoU mob > pixel; IG `>=0.20` / occlusion `>=0.15` (20-subset refs) |
-| text SST-2 (2-class, min conf 0.9953) | reviews | n/a (logits are labels) | 1.0000 | full-curve `>=0.85`, native-string `>=0.8`, sentiment-word hit rates |
+| MIT1003 ResNet18, RoT-maps/pixel | 150 | n/a (API outputs) | maps 0.9533 / pixel 0.1867 | maps `>=0.90`, pixel `<=0.30` (documented collapse); pointing mob 0.34 `>=0.28`, mob > pixel, rand `<=0.15`; box-IoU mob > pixel; IG `>=0.20` / `>=0.15` (20-subset refs) |
+| text SST-2 (2-class) | 58 reviews | n/a (logits are labels) | 1.0000 | full-curve `>=0.95`, native-string `>=0.8`, sentiment-word hit rates pos `>=0.5` / neg `>=0.6` |
 | nonlinear wine rbf vs linear | 178 | n/a | shaped 1.0000 vs linear 0.9944 | shaped `>=0.85`, `>=linear-0.02` |
 | tune tabular best/refit | 569 | — | 0.9789 / 0.9895 | `>=0.9` / `>=0.9` |
 | tune text best/refit | reviews | — | 1.0000 / 1.0000 | `>=0.85` / `>=0.85` |
-| tune image best/refit | 500 | — | 0.9520 / 0.9360 | `>=0.9` / `>=0.9` |
+| tune image best/refit | 1797 | — | 0.9733 / 0.9688 | `>=0.9` / `>=0.9` |
+
+## 5b. Proxy-ensemble floor setting (ToDo item 22)
+
+Live-fit floors cannot be validated on other hosts, so each tightened
+floor above was set from a local proxy ensemble and now carries a
+`ensemble` comment at the assertion site. Legs (same recipes as the
+tests; `/tmp/probe_ensemble.py`, `/tmp/probe_focused.py` — scratch,
+not committed): torch threads {1, 4} × fit seed {0, 1} × device
+{cpu, mps}. Threads 1-vs-4 are bit-identical everywhere (determinism
+holds within host); seed and backend legs spread as follows
+(minima in parentheses set the floors):
+
+- tabular binary acc 0.988–0.991 (0.988); top-8/7 overlap 5–6 (5);
+  corr 0.559–0.603 (0.559). Multiclass 0.968–0.969 (0.968).
+- compas gbm 0.880–0.881, svc 0.913–0.920, mlp 0.862–0.866;
+  wine 0.989 unanimous, pairwise top-3 overlap 3/3 unanimous.
+- breast-cancer RF held-out linear 0.979 / rbf 0.951 (single-host;
+  floors 0.9 keep margin); spearman 0.598–0.638 (floor 0.5).
+- text pos rate 0.552–0.724, neg 0.655–0.724, full 1.0 unanimous.
+- image binary 0.943–0.968; coords 0.277–0.346 (floor `maj+0.15`,
+  contrast `raw+0.1`); rich slice 0.998–1.0.
+- top-2 collapse coverage: 0.84 on same-seed CPU legs but 0.55 under
+  seed variation and 0.62 on MPS (bit-stable per backend). The 0.75
+  floor is kept as a CPU-contract tendency with an explicit comment,
+  not a portable bound — the degenerate landscape decides the
+  collapse pattern below ulp level. MPS runs are exploratory-only
+  (see `development.md`); the suite contract is CPU.
 
 Gate note (not committed as a test): TinyCNN-trunk `(500,8,8,8)` maps as a
 backbone reached only ~0.49 on 10-class digits, so the committed rich test
@@ -139,9 +189,11 @@ uses the MobileNet path (~0.99).
 
 ## 6. Runtimes (machine-specific baselines, §1 hardware)
 
-Full suite: **228 passed, warm 349.74s (0:05:49).** The session-autouse
-determinism fixture single-threads torch, so this run is slower than the
-previous baseline (184 passed, cold 308.81s, warm 149.79s).
+Full suite: **253 passed, warm 285.54s (0:04:45)** on grown artifacts
+(digits 1797, compas 2000, 58 reviews; rich image arm on a 500-slice).
+The session-autouse determinism fixture single-threads torch. Slowest
+drivers: rich-backbone fit + reveal curve (~137s), MobileNet feature
+setups, HX fidelity setup, text SST-2 fits on 58 reviews.
 Cold≫warm gap is dominated by first-use caches (plot text/wordcloud
 163.6s→2.7s) and live feature extraction setups.
 
@@ -373,18 +425,21 @@ legacy imports gone; padding utils exported.
 Pins for `nonlinear=`: default path unchanged; spec validation; identity at
 init (rbf/hinge); hyperparameters reach module; manual-formula match;
 additive decomposition (K=2/3 × rbf/dict); masked positions stay zero; ring
-separation linear cannot do (rbf + hinge); reveal pipeline; persistence
-round-trip.
+separation on committed mock weights (linear `<0.7`, shaped `>=0.9`,
+margin `>=0.2`; live 250/400ep replaced); reveal pipeline (live 60ep);
+persistence round-trip (live 80ep).
 
 ### `tests/test_persistence.py` (8)
 
-Pins for save/load: round-trip identical outputs (tabular/text/image);
-`mins`/`maxs` restored; `device=` on load; foreign files rejected;
-exact version-match enforcement (mismatch + missing stamp rejected).
+Pins for save/load from committed mock fits (no live fitting): round-trip
+identical outputs (tabular/text/image); `mins`/`maxs` restored; `device=`
+on load; foreign files rejected; exact version-match enforcement (mismatch
++ missing stamp rejected).
 
 ### `tests/test_plot.py` (24)
 
-Pins for `rot.plot`: single-row figures (waterfall/force/decision);
+Pins for `rot.plot` from a committed mock tabular fit (30ep live fit
+replaced; multiclass plots from a mock 3-class fit): single-row figures (waterfall/force/decision);
 batch figures (bar/beeswarm); values/base use class bias; HTML sign colours;
 max-tokens truncation; matplotlib text figure; saliency with/without image;
 saliency power/trim sweep; multiclass per-class bar/waterfall;
@@ -394,13 +449,15 @@ existing axes).
 
 ### `tests/test_calibrated.py` (4)
 
-Pins for calibrated ground-truth fixtures (xai-units lesson, reimplemented):
-exact handcrafted linear black box; rank/top-k/sign recovery vs `|w|`;
+Pins for calibrated ground-truth fixtures (xai-units lesson, zero new
+dependencies) on committed mock fits (200ep live fits replaced; tight
+floors in §4d): exact handcrafted linear black box; rank/top-k/sign recovery vs `|w|`;
 multiclass per-class top-1; interacting labels trip the quality wire.
 
 ### `tests/test_faithfulness.py` (3)
 
-Pins for faithfulness probes on known mechanisms: tabular deletion gap;
+Pins for faithfulness probes on committed mock weights (60/100ep live fits
+replaced; tight margins in §4d): tabular deletion gap; localized-square
 localized-square pointing-game; noise columns below signal.
 
 ### `tests/test_text.py` (14)

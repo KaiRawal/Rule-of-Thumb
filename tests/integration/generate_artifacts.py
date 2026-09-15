@@ -151,8 +151,8 @@ def make_digits_image(manifest, per_class_binary=60):
     rng.shuffle(bin_idx)
 
     # multiclass subset: same selection rule as the tabular artifacts so both
-    # views describe the same 500 digits
-    xm, ym_true = _digit_subset(50)
+    # views describe the same digits (full 1797-digit set, not a 500 subset)
+    xm, ym_true = _digit_subset(200)
     xm = xm.astype(np.float32).reshape(-1, 1, 8, 8)
     xt = torch.from_numpy(xm)
 
@@ -306,7 +306,7 @@ def _save_tabular_case(manifest, stem, x, feature_names, models, predictions, y_
     print(f"{stem}: x{x.shape}, black-box train accuracy — {scores}")
 
 
-def make_compas(manifest, n_rows=800):
+def make_compas(manifest, n_rows=2000):
     """ProPublica COMPAS two-year recidivism with the canonical filters."""
     df = pd.read_csv(COMPAS_URL)
     df = df[
@@ -374,6 +374,33 @@ REVIEWS = [
     "Vibrant, inventive filmmaking that rewards a second viewing.",
     "The worst kind of sequel: cynical, loud and completely unnecessary.",
     "Graceful, haunting and wonderfully acted. Don't miss it.",
+    "A brilliant heist movie with a wonderfully intricate plot and superb comic timing.",
+    "Phenomenal cinematography and a stunning score carry this quiet, powerful drama.",
+    "An enchanting fable, beautifully told and full of genuine warmth.",
+    "Flawless pacing and a brilliant ensemble make this an instant favourite.",
+    "A magnificent achievement: bold, moving and superbly crafted throughout.",
+    "Captivating from start to finish, with a wonderful lead performance.",
+    "A powerful, tender story told with superb restraint and gorgeous imagery.",
+    "Brilliant dialogue and wonderful chemistry between the two leads.",
+    "A stunning debut feature: assured, original and deeply felt.",
+    "Delightful and touching in equal measure, with a superb final act.",
+    "A wonderful reminder of what mainstream cinema can do at its best.",
+    "Gripping, superbly acted and beautifully photographed. Unmissable.",
+    "An awful, boring slog that mistakes noise for excitement.",
+    "Dreadful dialogue and terrible acting sink this dull vanity project.",
+    "An atrocious script full of horrible cliches and lifeless characters.",
+    "Tedious, flat and painfully unfunny from the opening scene.",
+    "A disastrous misfire: ugly, boring and completely misjudged.",
+    "Horrible pacing and weak performances make this a painful watch.",
+    "A dull, abysmal comedy that fails at every single joke.",
+    "Terrible editing and an awful score cannot save this lifeless sequel.",
+    "An insult to the audience: crude, boring and twice as long as it feels.",
+    "Weak plotting and dreadful exposition drag this fantasy down.",
+    "Flat, forgettable and awful: the year's most disappointing release.",
+    "A painful, tedious drama with nothing to recommend it.",
+    "Horrible sound design and murky visuals complete this awful mess.",
+    "Dull beyond belief, with terrible villains and zero tension.",
+    "An atrocious ending ruins two hours of merely mediocre buildup.",
 ]
 
 
@@ -562,7 +589,7 @@ def main():
         "files": {},
     }
     make_tabular_binary(manifest)
-    x_tab, y_tab = _digit_subset(50)
+    x_tab, y_tab = _digit_subset(200)
     make_digits_tabular(manifest, x_tab, y_tab)
     make_digits_image(manifest)
     write_reviews(manifest)

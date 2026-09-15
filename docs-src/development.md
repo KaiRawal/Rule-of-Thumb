@@ -51,6 +51,16 @@ would break the fixture on every release) instead of refitting: the
 the forward pass is stable to ulp level. Remint both artifacts together
 with `tests/integration/mint_pet_weights.py` if the model or fit changes.
 
+The same rule covers the unit-test mock weights: `tests/fixtures/*.pt`
+(raw state dicts + rebuild specs, loaded via `tests/_mock_weights.py`)
+replace every unit fit whose test asserts on outputs rather than fitting.
+Remint with `tests/mint_unit_weights.py` (`--check` re-verifies every
+tightened margin) if a covered fit changes; dataset builders are
+single-sourced in the loader, so mint and tests cannot drift. Integration
+tests keep fitting live end-to-end (ToDo item 22): their floors stay
+honest, set by proxy-ensemble measurement (seeds × threads × device) and
+recorded in `tests/TEST_SUITE.md`.
+
 ## Automation map
 
 | Event | What runs | Effect |
