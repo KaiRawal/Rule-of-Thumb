@@ -6,6 +6,42 @@ the top: dummy data, plain CPU, a few seconds each.
 
 ## Gentle beginnings
 
+```{image} _static/figures/card-tabular.light.png
+:class: only-light
+:target: notebooks/01_tabular_quickstart.ipynb
+:alt: Bar chart of per-column importances — opens the tabular demo
+```
+
+```{image} _static/figures/card-tabular.dark.png
+:class: only-dark
+:target: notebooks/01_tabular_quickstart.ipynb
+:alt: Bar chart of per-column importances — opens the tabular demo
+```
+
+```{image} _static/figures/card-text.light.png
+:class: only-light
+:target: notebooks/02_text_quickstart.ipynb
+:alt: Sentence with the word wonderful highlighted red — opens the text demo
+```
+
+```{image} _static/figures/card-text.dark.png
+:class: only-dark
+:target: notebooks/02_text_quickstart.ipynb
+:alt: Sentence with the word wonderful highlighted red — opens the text demo
+```
+
+```{image} _static/figures/card-image.light.png
+:class: only-light
+:target: notebooks/03_image_quickstart.ipynb
+:alt: Saliency overlay highlighting the circle — opens the image demo
+```
+
+```{image} _static/figures/card-image.dark.png
+:class: only-dark
+:target: notebooks/03_image_quickstart.ipynb
+:alt: Saliency overlay highlighting the circle — opens the image demo
+```
+
 | Notebook | What you will see happen |
 |---|---|
 | [Tabular demo](notebooks/01_tabular_quickstart.ipynb) | Tables: fitting, ranking, a reveal curve vs random, waterfall/force/decision plus batch bar/beeswarm |

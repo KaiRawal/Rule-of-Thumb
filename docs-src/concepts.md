@@ -82,3 +82,35 @@ argument, with experiments across language models, proprietary-system
 audits, and scientific discovery, the
 [paper](https://arxiv.org/abs/2608.10766) is the place to go; the
 rest of these docs is the hands-on version.
+
+## Should you trust this explanation?
+
+Three checks, in this order — they separate the questions people
+usually blur together.
+
+**1. Does the stand-in copy the box?** Look at
+`exp.train_agreement_`, the stand-in's accuracy against the black
+box's answers on your training inputs. Near 1, carry on. Below about
+0.75 the fit warns you outright, and the importances may be
+gibberish. The usual causes — too little data, the wrong backbone,
+a task the pooled representation cannot see — are walked through in
+[Limits](capacity.md). This is the *when RoT fits* question, and it
+comes before everything else: no agreement, no explanation.
+
+**2. Does the ranking earn its keep?** A reveal curve should beat a
+random uncovering order (`score_ordering` against a seeded random
+baseline). If the most-important-first curve holds the right answer
+with very little revealed while random flounders, the ranking is
+doing real work. If the two curves hug each other, the importances
+may be no better than a hunch — even with good agreement. The
+[reveal curves](reveal.md) page shows how to run the comparison.
+
+**3. Are you judging the right thing?** Fidelity to the black box
+and plausibility to a human are separate metrics. An explanation can
+reproduce the model faithfully yet look nothing like a human
+rationale (the saliency-versus-gaze notebooks show this plainly),
+and it can look sensible while missing the model's actual
+reasoning. Decide which one you need before you pick a score —
+[Limits](capacity.md) keeps the two judgements apart, and the
+[test-suite report](test-report.md) shows what each costs to
+measure.

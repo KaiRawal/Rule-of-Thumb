@@ -186,3 +186,13 @@ examples
 
 api
 ```
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+:caption: Project
+
+releases
+migration
+development
+```

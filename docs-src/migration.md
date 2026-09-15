@@ -1,7 +1,3 @@
----
-orphan: true
----
-
 # Migration notes
 
 Breaking changes across the 0.x line. The package is pre-1.0: breaking
