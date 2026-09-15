@@ -12,7 +12,7 @@ are provenance notes only; the legacy code did not move with the package.
 
 ## API / correctness
 
-22. **Committed-weights robustness program for the test suite.** Long SGD
+22. **Committed-weights robustness program for the test suite (P0).** Long SGD
     fits in underdetermined regimes land in different minima per BLAS
     kernel, so no live-fit absolute floor is portable across hosts (seen:
     pets heatmap corr `0.36–0.52` vs `1.0`, text native accuracy `0.65`
@@ -29,7 +29,7 @@ are provenance notes only; the legacy code did not move with the package.
     `TEST_SUITE.md` updates. Done when CI is green with no live-fit
     absolute floors outside the must-live set.
 
-23. **RoT stability across hardware (research).** The suite has proven the
+23. **RoT stability across hardware (research, P2).** The suite has proven the
     method property behind item 22: long fits in underdetermined regimes
     (N=31/E=768 text, 20-sample/576-ch pets) reach different minima per
     kernel, so explanations and fidelity can wobble across machines.
@@ -39,7 +39,7 @@ are provenance notes only; the legacy code did not move with the package.
     explanations/fidelity invariant across kernels; any API change needs
     a migration note.
 
-24. **Explanation quality beyond fidelity (research).**
+24. **Explanation quality beyond fidelity (research, P1).**
     Fidelity-to-black-box and plausibility-to-human-rationales are
     separate metrics and must be measured separately: deletion/insertion
     curves always against random baselines, rank-agreement metrics, and
@@ -48,13 +48,13 @@ are provenance notes only; the legacy code did not move with the package.
     pooled representations for rare lexical signals (further evidence
     for item 16); near-single-class black boxes need explicit handling
     before any explanation is attempted. No implementation commitment.
-25. **Center-prior comparison for image agreement (research).**
+25. **Center-prior comparison for image agreement (research, P2).**
     Human-agreement scores for saliency are dominated by position priors
     (a static center control beats learned maps). The fidelity gate and
     any saliency-as-detector guidance should require beating a center
     control by margin, or the docs must state plainly that saliency is
     not gaze prediction. No implementation commitment.
-28. **Allow non-0.5 dropout rates.** Dropout is currently a fixed method
+28. **Allow non-0.5 dropout rates (done: 8a9b902).** Dropout is currently a fixed method
     constant (0.5): the constructors, factories and `autotune` search
     space accept no `dropout_rate`, since only 0.5 keeps every partial
     observation equally likely (uniform over reveal subsets). If the
@@ -62,11 +62,11 @@ are provenance notes only; the legacy code did not move with the package.
     the parameter behind a flag and reintroduce the search dimension —
     with reveal-curve scoring reweighted to match the sampling
     distribution. Until then the `test_dropout_rate_is_not_tunable`
-    pin stays.
+    pin stays (pinned at `tests/test_tune.py:186`).
 
 ## New functionality
 
-16. **Optional per-location importance weights (deferred: rich backbones cover
+16. **Optional per-location importance weights (deferred, P3: rich backbones cover
     real use).** Definitions: `K` is the number of classes (2 for cat-vs-dog,
     10 for digits); `E` is the embedding length per token; `C` is the channel
     count per pixel; `T`/`H`/`W` are tokens/height/width. The text and image
@@ -95,7 +95,7 @@ are provenance notes only; the legacy code did not move with the package.
     raw inputs (`2·K·H·W` parameters), behind a constructor flag so the
     legacy behaviour stays the default.
 
-20. **Documentation content and presentation pass.** The reference docs are
+20. **Documentation content and presentation pass (P1).** The reference docs are
     complete but the site undersells the package: no conceptual overviews
     (when RoT fits, how it differs from sensitivity-based explainers, how
     to judge trust), examples are hello-worlds on dummy data only, plots
@@ -109,7 +109,7 @@ are provenance notes only; the legacy code did not move with the package.
     gallery thumbnails, tighter nav grouping, small custom CSS. Non-goal:
     no theme switch.
 
-21. **Publication-ready plots via `shap-editorial`.** `shap-editorial`
+21. **Publication-ready plots via `shap-editorial` (P1).** `shap-editorial`
     (MIT, v0.1.x alpha, single maintainer — exact pin, treat as
     replaceable) renders beeswarm/waterfall/bar/scatter from duck-typed
     `shap.Explanation` objects, returning `(fig, ax)`; it is now a base
@@ -124,7 +124,7 @@ are provenance notes only; the legacy code did not move with the package.
     upstream — slice a class first, matching our per-class outputs). Ship
     with tests, a gallery demo under item 20(c), and README/docs updates.
 
-27. **Full-dataset and large-scale validation (research).** The
+27. **Full-dataset and large-scale validation (research, P3).** The
     integration tier validates on slices (3000-post text slice,
     150-subset images) because the dev machine cannot stage dense
     full-train embeddings (~4.5 GB float32 for 15k×96×768) or finish
@@ -134,7 +134,7 @@ are provenance notes only; the legacy code did not move with the package.
     implement out-of-core RoT training — stream batches from disk
     (memmap chunks) through `training_loop` so fits run when the data
     does not fit in memory at once. No implementation commitment.
-29. **Keras-style fit-to-convergence training.** Searching a fixed
+29. **Keras-style fit-to-convergence training (P1).** Searching a fixed
     `epochs` grid is a stand-in, not a stopping rule: train until the
     surrogate is determined to be fit — stop when surrogate-vs-blackbox
     agreement (or validation reveal fidelity) plateaus, with a max-epoch
@@ -145,7 +145,7 @@ are provenance notes only; the legacy code did not move with the package.
     what "fit" can mean) and item 23 (stability across minima).
 
 30. **Opt-in explanation evaluation (agreement, reveal gap, human-data
-    comparison).** An explicit `Explainer.evaluate(...)` reporting only
+    comparison) (P1).** An explicit `Explainer.evaluate(...)` reporting only
     realised, research-backed measures: (a) **fit agreement** —
     in-sample plus a seeded held-out split, warning below 0.75
     (extends the existing `train_agreement_` tripwire rather than
@@ -165,7 +165,7 @@ are provenance notes only; the legacy code did not move with the package.
      only its labels, so interventions stay an opt-in accuracy-testing
      path, never a default.
 
-31. **Per-datapoint misprediction warning (pending).** When a user
+31. **Per-datapoint misprediction warning (pending, P1).** When a user
     explains rows whose model predictions are known, rows the
     stand-in itself gets wrong deserve a warning: their explanations
     are absurd and meaningless, and the user should be told so —
@@ -181,13 +181,79 @@ are provenance notes only; the legacy code did not move with the package.
     indices, matching rows stay quiet, plus multiclass and masked-text
     cases. Not started.
 
+32. **Brand/graphics refresh (static assets only, P2).** Distinct from
+    improving the `plot.*` visualisations themselves and from item
+    20's in-theme presentation work: redraw the repo/docs identity
+    set — mark (`logo.svg` / `logo-dark.svg`), favicon set, README
+    header banner, and hero/card figures regenerated through
+    `docs-src/_figures/generate_figures.py` (the dummy-data-only rule
+    stays; light/dark pairs stay). Scope is `_static/` plus the
+    `README.md` header and the `index.md` hero/cards only: no
+    `plot.py` API change, no theme switch (item 20's non-goal
+    stands), and the palette keeps the binding red=toward /
+    blue=against convention. Done when the assets land in pairs and
+    every referencing page (`index`, `plots`, `README`) renders in
+    both themes with a green RTD build. Not started.
+
+35. **Interactive explanation explorers (spike, tech open, P2).** No
+    interactive visualisation exists today (repo-wide grep: no
+    `ipywidgets` / `anywidget` / `plotly` / `bokeh`; `plot.text_html`
+    is static HTML, everything else returns a static matplotlib
+    `Figure`). Goal only, stack to be decided by spike: prototype
+    `anywidget` custom views *and* `ipywidgets`-driven matplotlib
+    controls against the same computed `imp` / `order` (reveal-step
+    slider, saliency `power` / `trim` sliders, token hover), then
+    pick per effort, fidelity and RTD-embeddability. Hard
+    constraints: a new optional extra only, the `plot.*`
+    Figure-returning contract unchanged (widgets wrap, never
+    replace), a static fallback always one call away, and no new
+    required dependencies. Ship the decision plus one pilot widget
+    with tests, a gallery demo under item 20(c), and README/docs
+    updates. Done when the pilot renders in JupyterLab and VSCode
+    (plus Colab/RTD if the chosen stack allows). Not started.
+
 ## Release / maintenance
 
 18. PyPI release checklist: three-place version bump (`pyproject.toml`,
     `src/ruleofthumb/__init__.py`, `tests/test_explain.py` assertion) plus
     `ToDo.md` changelog entry, then commit, push, and tag — CI builds and
     uploads (TestPyPI on `main`, PyPI on `v*` tags via trusted publishing),
-    RTD rebuilds; verify each stage per PUBLISH.md.
+    RTD rebuilds; verify each stage per PUBLISH.md. (Standing ritual —
+    last exercised at release 0.0.2, `b4c32d4`.)
+
+33. **Conda-forge distribution alongside PyPI (P2).** Conda-forge is
+    currently absent everywhere (no recipe, no workflow mentions).
+    Work: provision a `ruleofthumb-rot` feedstock via a staged-recipes
+    PR (conda-forge name to confirm against the PyPI
+    `ruleofthumb-rot` vs import-name `ruleofthumb` mapping), with a
+    `meta.yaml` mapping the base and extras dependencies to conda
+    packages (verify torch CPU builds plus `transformers`,
+    `torchvision`, `captum` and `shap` availability; `noarch: python`
+    only if everything resolves, else an arch split). Thereafter rely
+    on the regro-cf autotick bot watching PyPI for version bumps
+    rather than custom automation, and extend item 18's checklist
+    plus `PUBLISH.md` with the feedstock step. Done when `mamba
+    install -c conda-forge ruleofthumb-rot` works from a clean env
+    and the bot picks up the next tag without manual intervention.
+    Standing cost, recorded here: feedstock maintenance (pin churn,
+    bot-PR merges). Not started.
+
+34. **Binder launch for all six example notebooks (P3).** Add repo2docker
+    config (`environment.yml` with mamba plus `postBuild`) and
+    launch badges (`README.md`, `docs-src/examples.md`) covering the
+    dummy-data hello-worlds (`01`, `02`, `03`, `06`) *and* the heavy
+    `04_hatexplain` / `05_salicon` notebooks, with explicit
+    mitigations rather than rewrites: the env must fit a shared
+    Binder session (torch plus `transformers`, `torchvision`,
+    `captum`, `shap` make a GB-scale image with slow cold builds),
+    the `04` / `05` download cells (dataset JSONs, MIT zips, model
+    weights) stay as-is but slow first launches get documented, and
+    the ~2 GB RAM ceiling is validated by actually launching each
+    notebook top-to-bottom from the badge. `mybinder.org` itself is
+    free (no account, no SLA, queued shared builds). Non-goal: no
+    notebook rewrites to fit Binder; the RTD-executed docs stay
+    canonical. Done when all six run badge-to-finish in a fresh
+    Binder session. Not started.
 
 ## Non-goals
 
