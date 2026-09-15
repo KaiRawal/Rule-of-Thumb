@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "hit_rate": 0.75
+  },
+  "maxs": [
+    0.6347965002059937
+  ],
+  "mins": [
+    -3.3415703773498535
+  ],
+  "model": "image",
+  "n_classes": 2,
+  "sample_shape": [
+    1
+  ]
+}

@@ -1,32 +1,27 @@
-"""Unit tests for explainer persistence (:meth:`Explainer.save` / :func:`load_explainer`)."""
+"""Unit tests for explainer persistence (:meth:`Explainer.save` / :func:`load_explainer`).
+
+Fitted models arrive as committed mock weights (``tests/_mock_weights.py``):
+these tests assert on save/load round-trips, so the fit itself is incidental.
+The ``.rotx`` path stays fully exercised — mock weights arrive as raw
+``.pt`` state dicts, never ``.rotx``.
+"""
 
 import numpy as np
 import pytest
 import torch
+from _mock_weights import data_persist, load_mock
 
-from ruleofthumb import fit_image, fit_tabular, fit_text, load_explainer
-
-
-def _dataset(modality):
-    from ruleofthumb.text import lengths_to_mask
-
-    rng = np.random.RandomState(0)
-    y = (rng.rand(32) > 0.5).astype(np.int64)
-    if modality == "tabular":
-        return (rng.rand(32, 4).astype(np.float32), None, y)
-    if modality == "text":
-        mask = lengths_to_mask(np.array([6, 4] * 16), 6).numpy()
-        return (rng.rand(32, 6, 4).astype(np.float32), mask, y)
-    return (rng.rand(32, 3, 5, 5).astype(np.float32), None, y)
+from ruleofthumb import load_explainer
 
 
 def _fit(modality, x, padding, y):
-    kwargs = {"epochs": 8, "batch_size": 16, "learning_rate": 0.05, "seed": 0}
-    if modality == "tabular":
-        return fit_tabular(y, x, **kwargs)
-    if modality == "text":
-        return fit_text(y, x, mask=padding, **kwargs)
-    return fit_image(y, x, **kwargs)
+    """Load the committed mock fit (datasets match the builders by construction)."""
+    del x, padding, y
+    return load_mock(f"persist_{modality}")
+
+
+def _dataset(modality):
+    return data_persist(modality)
 
 
 @pytest.mark.parametrize("modality", ["tabular", "text", "image"])
@@ -50,7 +45,7 @@ def test_round_trip_restores_mins_maxs(tmp_path):
     exp = _fit("tabular", x, None, y)
     exp.save(str(tmp_path / "explainer.rotx"))
 
-    loaded = load_explainer(str(tmp_path / "explainer.rotx"))
+    loaded = load_explainer(str(tmp_path / "explainer.rotx"), device="cpu")
     assert torch.allclose(loaded.model.mins, exp.model.mins)
     assert torch.allclose(loaded.model.maxs, exp.model.maxs)
 

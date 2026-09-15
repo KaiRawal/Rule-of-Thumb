@@ -1,0 +1,22 @@
+{
+  "checks": {
+    "min_accuracy": 0.9,
+    "min_margin_over_linear": 0.2
+  },
+  "maxs": [
+    1.9891871213912964,
+    1.9978160858154297
+  ],
+  "mins": [
+    -1.9992343187332153,
+    -1.9971119165420532
+  ],
+  "model": "tabular",
+  "n_classes": 2,
+  "nonlinear": {
+    "type": "rbf"
+  },
+  "sample_shape": [
+    2
+  ]
+}

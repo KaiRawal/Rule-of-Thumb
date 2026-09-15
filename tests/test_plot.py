@@ -8,17 +8,15 @@ from matplotlib.figure import Figure
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+from _mock_weights import data_plot_tabular, data_plot_tabular_multi, load_mock
 
-from ruleofthumb import fit_tabular, plot
+from ruleofthumb import plot
 
 
 @pytest.fixture()
 def tabular_case():
-    rng = np.random.RandomState(0)
-    x = rng.rand(40, 4).astype(np.float32)
-    y = ((x[:, 0] + x[:, 1]) > 1.0).astype(np.int64)
-    explainer = fit_tabular(y, x, epochs=30, batch_size=40, learning_rate=0.05, seed=0)
-    yield explainer, x
+    x, _, _ = data_plot_tabular()
+    yield load_mock("plot_tabular"), x
     plt.close("all")
 
 
@@ -174,12 +172,8 @@ def test_reveal_draws_into_existing_axes():
 
 @pytest.mark.parametrize("class_idx", [0, 1, 2])
 def test_multiclass_per_class_plots_render(class_idx):
-    from ruleofthumb import fit_tabular
-
-    rng = np.random.RandomState(5)
-    x = rng.randn(48, 4).astype(np.float32)
-    y = (x[:, 0] > 0).astype(np.int64) + (x[:, 1] > 0).astype(np.int64)
-    exp = fit_tabular(y, x, epochs=8, batch_size=48, learning_rate=0.05, seed=0, n_classes=3)
+    x, _, _ = data_plot_tabular_multi()
+    exp = load_mock("plot_tabular_multi")
     assert isinstance(plot.bar(exp, x, class_idx=class_idx), Figure)
     assert isinstance(plot.waterfall(exp, x[:1], class_idx=class_idx), Figure)
     plt.close("all")

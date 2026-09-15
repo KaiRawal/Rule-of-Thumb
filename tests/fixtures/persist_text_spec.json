@@ -1,0 +1,11 @@
+{
+  "checks": {},
+  "maxs": Infinity,
+  "mins": -Infinity,
+  "model": "text",
+  "n_classes": 2,
+  "sample_shape": [
+    6,
+    4
+  ]
+}
