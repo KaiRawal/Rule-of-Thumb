@@ -287,6 +287,61 @@ are provenance notes only; the legacy code did not move with the package.
     normal path, and 29/30's remaining scope is either shipped inside
     this item or explicitly re-scoped. Not started.
 
+38. **Dropout-granularity divergence audit (P0).** The package drops
+    whole reveal units per draw while the research monorepo mostly
+    drops individual elements — but the picture differs per modality
+    and must be recorded, not "fixed" blindly. Tabular: no
+    divergence (legacy base `AdversarialAttack/rot_class.py:36` and
+    the OpenXAI patch draw per-feature `(N, d)`; package `core.py`
+    draws `(N,) + imp.shape[2:]` — identical). Text: legacy
+    disagreed with itself — Judicial `RoT_text` draws per-token
+    `(N, T)`, MovieReview shipped per-(token, element) `(N, T, E)`
+    with the per-token version left in as a comment; package
+    (`text.py`) draws per-token `(N, T)` with padding-mask
+    intersection, i.e. the Judicial variant. Image: genuine
+    divergence — legacy draws per-(channel, pixel) `(N, C, H, W)`,
+    package (`image.py`) draws per-pixel `(N, H, W)` with channels
+    shared. Case for whole-unit (keep): reveal units are hidden
+    wholesale at scoring time (decision: unit granularity), so
+    training must sample the same intervention distribution; only
+    whole-unit drops at 0.5 are uniform over reveal subsets (item
+    28); padding interplay is clean; 576× fewer RNG draws on images.
+    Case for per-element (legacy): exact fidelity to two shipped
+    behaviors (pets-5000, MovieReview), finer per-step noise. The
+    sandbox settled it empirically: a granularity shim measured
+    +0.002 (noise), so reversing package behavior would break every
+    committed weight and floor for zero gain — decision: keep, and
+    write the rationale down (code comments + capacity docs) where
+    it currently exists nowhere. Follow-up characterization (no
+    behavior change): dropout *presence* is load-bearing (dropout0
+    heals the image distribution gap; zeroed-b craters fidelity) —
+    record what it does to the solution. Not started.
+
+39. **Sandbox replication feedback batch (P1).** Findings from the
+    RoT-Sandbox 4-experiment + image replication runs
+    (`PACKAGE_FEEDBACK.md`, package 0.0.2 used as-is, 3/4 pass with
+    the Pima 0.026 gap standing as a ticket — no gate widening):
+    (1) MPS float64 input-path crash — `fit_*` cast via
+    `_as_float_inputs` but `predict` / `get_order` / `score` and
+    `tune` validation forward raw float64; apply the cast on the
+    input path with regression tests (MPS-gated + CPU float64
+    autotune smoke). (2) Legacy-default drift — legacy
+    `RuleOfThumb` defaulted to `epochs=1500, lr=0.005` vs package
+    `500/0.05`; ship a docs table mapping legacy defaults per
+    experiment (a `legacy=` preset, if wanted, belongs to item 37's
+    autotune-space design, not a third track). (3) Batch-size guard
+    noise — the oversized-batch warning fires per autotune
+    candidate; warn once per fit. (4) Stochasticity disclosure —
+    document which replication-relevant stages are/aren't seeded
+    with variance expectations next to fidelity headlines (feeds
+    item 23); no API change. (5, from the image-run addendum)
+    `plot.saliency` ship-defaults `power=1.0/trim=2.0` vs the
+    paper-canonical `3.0/3.0` (`run.py` constants) despite the
+    legacy-port docstring — document the canonical values; a
+    default change is breaking and explicitly deferred. Action item
+    5 of the report (autotune scoring caveat) needs no tracking:
+    it validates item 37's premise. Not started.
+
 ## Release / maintenance
 
 18. PyPI release checklist: three-place version bump (`pyproject.toml`,
