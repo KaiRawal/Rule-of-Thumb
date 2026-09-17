@@ -57,12 +57,32 @@ class RoTText(RoT):
     every token is treated as real data.
     """
 
-    def __init__(self, classes, sample_shape, use_BCE_loss=False, l1_penalty=0.01, device=None, nonlinear=None):
+    def __init__(
+        self,
+        classes,
+        sample_shape,
+        use_BCE_loss=False,
+        l1_penalty=0.01,
+        device=None,
+        nonlinear=None,
+        share_weights=True,
+    ):
+        if len(sample_shape) != 2:
+            raise ValueError(f"text sample_shape must be (tokens, embedding), got {sample_shape}")
         super().__init__(classes, sample_shape, use_BCE_loss, no_a_b=True, device=device, nonlinear=nonlinear)
-        self.a = nn.Parameter(torch.zeros((classes, sample_shape[1]), requires_grad=True, device=self.device))
-        self.b = nn.Parameter(torch.zeros((classes, sample_shape[1]), requires_grad=True, device=self.device))
+        self.share_weights = bool(share_weights)
+        weight_shape = (classes, sample_shape[1]) if self.share_weights else (classes, *sample_shape)
+        self.a = nn.Parameter(torch.zeros(weight_shape, requires_grad=True, device=self.device))
+        self.b = nn.Parameter(torch.zeros(weight_shape, requires_grad=True, device=self.device))
         self.weights = (self.a, self.b, self.g)
         self.l1_penalty = l1_penalty
+
+    def _check_input_shape(self, points):
+        if not self.share_weights and tuple(points.shape[1:]) != self.sample_shape:
+            raise ValueError(
+                "unshared text weights are locked to the fit-time shape "
+                f"{self.sample_shape}, got {tuple(points.shape[1:])}"
+            )
 
     def _unit_importance(self, points, mask=None, granularity="unit", sample_chunk=None, class_chunk=None):
         """Token-unit importances computed in sample/class chunks.
@@ -74,6 +94,7 @@ class RoTText(RoT):
         """
         sample_chunk, class_chunk = _resolve_chunks(sample_chunk, class_chunk)
         points = torch.as_tensor(points, device=self.device)
+        self._check_input_shape(points)
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
         n, tokens = points.shape[0], points.shape[1]
@@ -93,13 +114,20 @@ class RoTText(RoT):
                     a = self.a[k : k + class_chunk]
                     b = self.b[k : k + class_chunk]
                     if granularity == "unit":
-                        block = torch.einsum("ke,nte->nkt", a, resp)
-                        block += (a * b).sum(1).reshape(1, -1, 1)
+                        if self.share_weights:
+                            block = torch.einsum("ke,nte->nkt", a, resp)
+                            block += (a * b).sum(1).reshape(1, -1, 1)
+                        else:
+                            block = torch.einsum("kte,nte->nkt", a, resp)
+                            block += (a * b).sum(2).reshape(1, -1, tokens)
                         if mm is not None:
                             block *= mm[:, None]
                         out[s : s + sample_chunk, k : k + class_chunk] = block
                     else:
-                        block = a[None, :, None, :] * (resp[:, None] + b[None, :, None, :])
+                        if self.share_weights:
+                            block = a[None, :, None, :] * (resp[:, None] + b[None, :, None, :])
+                        else:
+                            block = a[None] * (resp[:, None] + b[None])
                         if mm is not None:
                             block *= mm[:, None, :, None]
                         out[s : s + sample_chunk, k : k + class_chunk] = block
@@ -107,9 +135,13 @@ class RoTText(RoT):
 
     def importance(self, points, mask=None):
         points = torch.as_tensor(points, device=self.device)
+        self._check_input_shape(points)
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
-        imp = self.a[None, :, None, :] * (self._respond(points)[:, None] + self.b[None, :, None, :])
+        if self.share_weights:
+            imp = self.a[None, :, None, :] * (self._respond(points)[:, None] + self.b[None, :, None, :])
+        else:
+            imp = self.a[None] * (self._respond(points)[:, None] + self.b[None])
         if mask is None:
             return imp
         return mask[:, None, :, None].to(imp.dtype) * imp
@@ -177,6 +209,7 @@ class RoTText(RoT):
         # range, zero initialisation instead of mean-centering, as in the
         # original text-experiment copies.
         points = torch.as_tensor(points, device=self.device)
+        self._check_input_shape(points)
         classifier_response = torch.as_tensor(classifier_response, device=self.device)
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
