@@ -275,6 +275,13 @@ class RoTImage(RoT):
                 upper = points.masked_fill(m == 0, float("-inf")).amax(dim=0)
                 lower = points.masked_fill(m == 0, float("+inf")).amin(dim=0)
                 mean = (points * m).sum(dim=0) / m.sum(dim=0).clamp(min=1)
+            # A position masked out in every sample leaves upper=-inf/lower=+inf,
+            # i.e. an inverted range. project() clamps b into it and torch returns
+            # max when min > max, so b becomes -inf and every masked importance
+            # turns into inf*0 = NaN, which the optimiser then spreads to all
+            # weights. Such positions contribute to no score, so zero bounds them.
+            upper = upper.nan_to_num(neginf=0.0)
+            lower = lower.nan_to_num(posinf=0.0)
         self.mins = -upper
         self.maxs = -lower
         with torch.no_grad():
