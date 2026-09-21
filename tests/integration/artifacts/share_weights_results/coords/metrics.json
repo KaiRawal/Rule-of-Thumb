@@ -1,0 +1,42 @@
+{
+  "backbone": "coords",
+  "label": "coordinate channels (C=3)",
+  "feature_shape": [
+    1797,
+    3,
+    8,
+    8
+  ],
+  "n_train": 1437,
+  "n_test": 360,
+  "majority_baseline": 0.10239287701725097,
+  "feature_extraction_secs": 3.7,
+  "modes": {
+    "shared": {
+      "a_shape": [
+        10,
+        3
+      ],
+      "parameters": 70,
+      "params_per_train_sample": 0.0,
+      "train_fidelity": 0.3633,
+      "test_fidelity": 0.35,
+      "generalisation_gap": 0.0133,
+      "fit_secs": 1.6
+    },
+    "unshared": {
+      "a_shape": [
+        10,
+        3,
+        8,
+        8
+      ],
+      "parameters": 3850,
+      "params_per_train_sample": 2.7,
+      "train_fidelity": 0.9722,
+      "test_fidelity": 0.975,
+      "generalisation_gap": -0.0028,
+      "fit_secs": 0.3
+    }
+  }
+}

@@ -1,0 +1,7 @@
+Downloading: "https://download.pytorch.org/models/resnet18-f37072fd.pth" to /mnt/cache/torch/hub/checkpoints/resnet18-f37072fd.pth
+  0%|          | 0.00/44.7M [00:00<?, ?B/s] 56%|█████▋    | 25.1M/44.7M [00:00<00:00, 262MB/s]100%|██████████| 44.7M/44.7M [00:00<00:00, 270MB/s]
+/home/azureuser/Rule-of-Thumb/src/ruleofthumb/explain.py:64: UserWarning: batch_size=5000 exceeds the 1437 samples; training runs full-batch. Pass batch_size<=1437 for minibatching, or a size suited to the input (e.g. 16-64 for 96px images).
+  warnings.warn(
+[resnet18/shared] train=1.0000 test=0.9667 params=10250
+[resnet18/unshared] train=1.0000 test=0.9944 params=501770
+[resnet18] done in 433.2s

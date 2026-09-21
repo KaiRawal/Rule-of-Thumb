@@ -139,11 +139,24 @@ class RoTImage(RoT):
     and are excluded from fit bounds and scores.
     """
 
-    def __init__(self, classes, sample_shape, use_BCE_loss=False, device=None, nonlinear=None):
+    def __init__(self, classes, sample_shape, use_BCE_loss=False, device=None, nonlinear=None, share_weights=True):
+        if share_weights and len(sample_shape) != 1:
+            raise ValueError(f"shared image sample_shape must be (channels,), got {sample_shape}")
+        if not share_weights and len(sample_shape) != 3:
+            raise ValueError(f"unshared image sample_shape must be (channels, height, width), got {sample_shape}")
         super().__init__(classes, sample_shape, use_BCE_loss, no_a_b=True, device=device, nonlinear=nonlinear)
-        self.a = nn.Parameter(torch.zeros((classes, sample_shape[0]), requires_grad=True, device=self.device))
-        self.b = nn.Parameter(torch.zeros((classes, sample_shape[0]), requires_grad=True, device=self.device))
+        self.share_weights = bool(share_weights)
+        weight_shape = (classes, sample_shape[0]) if self.share_weights else (classes, *sample_shape)
+        self.a = nn.Parameter(torch.zeros(weight_shape, requires_grad=True, device=self.device))
+        self.b = nn.Parameter(torch.zeros(weight_shape, requires_grad=True, device=self.device))
         self.weights = (self.a, self.b, self.g)
+
+    def _check_input_shape(self, points):
+        if not self.share_weights and tuple(points.shape[1:]) != self.sample_shape:
+            raise ValueError(
+                "unshared image weights are locked to the fit-time shape "
+                f"{self.sample_shape}, got {tuple(points.shape[1:])}"
+            )
 
     def _unit_importance(self, points, mask=None, granularity="unit", sample_chunk=None, class_chunk=None):
         """Pixel-unit importances computed in sample/class chunks.
@@ -157,6 +170,7 @@ class RoTImage(RoT):
         """
         sample_chunk, class_chunk = _resolve_chunks(sample_chunk, class_chunk)
         points = torch.as_tensor(points, device=self.device)
+        self._check_input_shape(points)
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
         n, height, width = points.shape[0], points.shape[2], points.shape[3]
@@ -176,13 +190,20 @@ class RoTImage(RoT):
                     a = self.a[k : k + class_chunk]
                     b = self.b[k : k + class_chunk]
                     if granularity == "unit":
-                        block = torch.einsum("kc,nchw->nkhw", a, resp)
-                        block += (a * b).sum(1).reshape(1, -1, 1, 1)
+                        if self.share_weights:
+                            block = torch.einsum("kc,nchw->nkhw", a, resp)
+                            block += (a * b).sum(1).reshape(1, -1, 1, 1)
+                        else:
+                            block = torch.einsum("kchw,nchw->nkhw", a, resp)
+                            block += (a * b).sum(1)
                         if mm is not None:
                             block *= mm[:, None]
                         out[s : s + sample_chunk, k : k + class_chunk] = block
                     else:
-                        block = a[None, :, :, None, None] * (resp[:, None] + b[None, :, :, None, None])
+                        if self.share_weights:
+                            block = a[None, :, :, None, None] * (resp[:, None] + b[None, :, :, None, None])
+                        else:
+                            block = a[None] * (resp[:, None] + b[None])
                         if mm is not None:
                             block *= mm[:, None, None]
                         out[s : s + sample_chunk, k : k + class_chunk] = block
@@ -192,9 +213,13 @@ class RoTImage(RoT):
         # Convolutional form.
         # Treat all spatial locations given by last two axis the same
         points = torch.as_tensor(points, device=self.device)
+        self._check_input_shape(points)
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
-        imp = self.a[None, :, :, None, None] * (self._respond(points)[:, None] + self.b[None, :, :, None, None])
+        if self.share_weights:
+            imp = self.a[None, :, :, None, None] * (self._respond(points)[:, None] + self.b[None, :, :, None, None])
+        else:
+            imp = self.a[None] * (self._respond(points)[:, None] + self.b[None])
         if mask is None:
             return imp
         return imp * mask.unsqueeze(1).unsqueeze(1).to(imp.dtype)
@@ -228,6 +253,7 @@ class RoTImage(RoT):
     ):
         assert points.shape[0] == classifier_response.shape[0]
         assert points.shape[1] == self.a.shape[1]
+        self._check_input_shape(points)
         points = torch.as_tensor(points, device=self.device)
         classifier_response = torch.as_tensor(classifier_response, device=self.device)
         if mask is not None:
@@ -235,18 +261,35 @@ class RoTImage(RoT):
         if seed is not None:
             torch.manual_seed(seed)
         if mask is None:
-            upper = points.amax(dim=(0, 2, 3))
-            lower = points.amin(dim=(0, 2, 3))
-            mean = points.mean(dim=(0, 2, 3))
+            reduce_dims = (0, 2, 3) if self.share_weights else (0,)
+            upper = points.amax(dim=reduce_dims)
+            lower = points.amin(dim=reduce_dims)
+            mean = points.mean(dim=reduce_dims)
         else:
             m = mask[:, None].to(points.dtype)
-            upper = points.masked_fill(m == 0, float("-inf")).amax(dim=(0, 2, 3))
-            lower = points.masked_fill(m == 0, float("+inf")).amin(dim=(0, 2, 3))
-            mean = (points * m).sum(dim=(0, 2, 3)) / m.sum(dim=(0, 2, 3)).clamp(min=1)
+            if self.share_weights:
+                upper = points.masked_fill(m == 0, float("-inf")).amax(dim=(0, 2, 3))
+                lower = points.masked_fill(m == 0, float("+inf")).amin(dim=(0, 2, 3))
+                mean = (points * m).sum(dim=(0, 2, 3)) / m.sum(dim=(0, 2, 3)).clamp(min=1)
+            else:
+                upper = points.masked_fill(m == 0, float("-inf")).amax(dim=0)
+                lower = points.masked_fill(m == 0, float("+inf")).amin(dim=0)
+                mean = (points * m).sum(dim=0) / m.sum(dim=0).clamp(min=1)
+            # A position masked out in every sample leaves upper=-inf/lower=+inf,
+            # i.e. an inverted range. project() clamps b into it and torch returns
+            # max when min > max, so b becomes -inf and every masked importance
+            # turns into inf*0 = NaN, which the optimiser then spreads to all
+            # weights. Such positions contribute to no score, so zero bounds them.
+            upper = upper.nan_to_num(neginf=0.0)
+            lower = lower.nan_to_num(posinf=0.0)
         self.mins = -upper
         self.maxs = -lower
         with torch.no_grad():
-            self.b.copy_(-mean.view(1, -1).expand_as(self.b))
+            if self.share_weights:
+                mean = mean.view(1, -1).expand_as(self.b)
+            else:
+                mean = mean.view(1, *mean.shape).expand_as(self.b)
+            self.b.copy_(-mean)
 
         optimiser = torch.optim.AdamW(self.parameters(), lr=lr)
         drop_out = self.dropout_rate

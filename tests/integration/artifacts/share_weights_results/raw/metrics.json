@@ -1,0 +1,42 @@
+{
+  "backbone": "raw",
+  "label": "raw pixels (C=1)",
+  "feature_shape": [
+    1797,
+    1,
+    8,
+    8
+  ],
+  "n_train": 1437,
+  "n_test": 360,
+  "majority_baseline": 0.10239287701725097,
+  "feature_extraction_secs": 3.8,
+  "modes": {
+    "shared": {
+      "a_shape": [
+        10,
+        1
+      ],
+      "parameters": 30,
+      "params_per_train_sample": 0.0,
+      "train_fidelity": 0.1176,
+      "test_fidelity": 0.1167,
+      "generalisation_gap": 0.0009,
+      "fit_secs": 1.3
+    },
+    "unshared": {
+      "a_shape": [
+        10,
+        1,
+        8,
+        8
+      ],
+      "parameters": 1290,
+      "params_per_train_sample": 0.9,
+      "train_fidelity": 0.9694,
+      "test_fidelity": 0.975,
+      "generalisation_gap": -0.0056,
+      "fit_secs": 0.3
+    }
+  }
+}

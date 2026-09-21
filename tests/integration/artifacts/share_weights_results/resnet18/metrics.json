@@ -1,0 +1,42 @@
+{
+  "backbone": "resnet18",
+  "label": "resnet18 frozen trunk",
+  "feature_shape": [
+    1797,
+    512,
+    7,
+    7
+  ],
+  "n_train": 1437,
+  "n_test": 360,
+  "majority_baseline": 0.10239287701725097,
+  "feature_extraction_secs": 410.1,
+  "modes": {
+    "shared": {
+      "a_shape": [
+        10,
+        512
+      ],
+      "parameters": 10250,
+      "params_per_train_sample": 7.1,
+      "train_fidelity": 1.0,
+      "test_fidelity": 0.9667,
+      "generalisation_gap": 0.0333,
+      "fit_secs": 8.1
+    },
+    "unshared": {
+      "a_shape": [
+        10,
+        512,
+        7,
+        7
+      ],
+      "parameters": 501770,
+      "params_per_train_sample": 349.2,
+      "train_fidelity": 1.0,
+      "test_fidelity": 0.9944,
+      "generalisation_gap": 0.0056,
+      "fit_secs": 12.7
+    }
+  }
+}
