@@ -1,0 +1,7 @@
+/home/azureuser/Rule-of-Thumb/src/ruleofthumb/explain.py:64: UserWarning: batch_size=5000 exceeds the 1437 samples; training runs full-batch. Pass batch_size<=1437 for minibatching, or a size suited to the input (e.g. 16-64 for 96px images).
+  warnings.warn(
+/home/azureuser/Rule-of-Thumb/src/ruleofthumb/explain.py:84: UserWarning: low train agreement (0.118 < 0.75); explanations may be unreliable. Check surrogate-vs-blackbox agreement before trusting them (see the capacity docs).
+  warnings.warn(
+[raw/shared] train=0.1176 test=0.1167 params=30
+[raw/unshared] train=0.9694 test=0.9750 params=1290
+[raw] done in 9.7s

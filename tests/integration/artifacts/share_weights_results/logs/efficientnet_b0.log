@@ -1,0 +1,7 @@
+Downloading: "https://download.pytorch.org/models/efficientnet_b0_rwightman-7f5810bc.pth" to /mnt/cache/torch/hub/checkpoints/efficientnet_b0_rwightman-7f5810bc.pth
+  0%|          | 0.00/20.5M [00:00<?, ?B/s]100%|██████████| 20.5M/20.5M [00:00<00:00, 352MB/s]
+/home/azureuser/Rule-of-Thumb/src/ruleofthumb/explain.py:64: UserWarning: batch_size=5000 exceeds the 1437 samples; training runs full-batch. Pass batch_size<=1437 for minibatching, or a size suited to the input (e.g. 16-64 for 96px images).
+  warnings.warn(
+[efficientnet_b0/shared] train=0.9993 test=0.9611 params=25610
+[efficientnet_b0/unshared] train=1.0000 test=0.9944 params=1254410
+[efficientnet_b0] done in 453.4s

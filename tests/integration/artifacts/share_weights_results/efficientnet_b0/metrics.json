@@ -1,0 +1,42 @@
+{
+  "backbone": "efficientnet_b0",
+  "label": "efficientnet_b0 frozen trunk",
+  "feature_shape": [
+    1797,
+    1280,
+    7,
+    7
+  ],
+  "n_train": 1437,
+  "n_test": 360,
+  "majority_baseline": 0.10239287701725097,
+  "feature_extraction_secs": 413.9,
+  "modes": {
+    "shared": {
+      "a_shape": [
+        10,
+        1280
+      ],
+      "parameters": 25610,
+      "params_per_train_sample": 17.8,
+      "train_fidelity": 0.9993,
+      "test_fidelity": 0.9611,
+      "generalisation_gap": 0.0382,
+      "fit_secs": 24.5
+    },
+    "unshared": {
+      "a_shape": [
+        10,
+        1280,
+        7,
+        7
+      ],
+      "parameters": 1254410,
+      "params_per_train_sample": 872.9,
+      "train_fidelity": 1.0,
+      "test_fidelity": 0.9944,
+      "generalisation_gap": 0.0056,
+      "fit_secs": 12.5
+    }
+  }
+}
