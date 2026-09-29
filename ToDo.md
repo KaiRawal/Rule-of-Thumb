@@ -340,7 +340,47 @@ are provenance notes only; the legacy code did not move with the package.
     legacy-port docstring — document the canonical values; a
     default change is breaking and explicitly deferred. Action item
     5 of the report (autotune scoring caveat) needs no tracking:
-    it validates item 37's premise. Not started.
+     it validates item 37's premise. Not started.
+
+40. **Explain a fact-checking LLM with RoT, validated against attention;
+    extend to hallucination probes (research, P3).** Get predictions from
+    `bespokelabs/Bespoke-MiniCheck-7B` on a benchmark dataset, then fit
+    RoT on input-text embeddings — either the MiniCheck backbone's own
+    hidden states or the default text embedder — and gauge per-token
+    importances. Measure RoT accuracy by comparing against saliency maps
+    derived from the model's attention mechanism (which input tokens the
+    model looked at for its binary output; exact aggregation left open).
+    On success, extend the same protocol to
+     `https://www.hallucination-probes.com/`. Ambitious, low priority.
+     Not started.
+
+41. **Example: explaining with extra features beyond the model inputs
+    (P2).** Add a compelling example notebook showing RoT fitted on
+    inputs augmented with features the black box never saw — as in the
+    research monorepo's resumes experiment (`SyntheticResumeFiltering`,
+    which prefixes each resume with its demographic metadata before
+    embedding). Dummy data only, following the `examples/0*.ipynb`
+    hello-world convention so it executes CPU-fast on docs builds.
+    Exact augmentation style and dataset left open at implementation
+    time. Not started.
+
+42. **T2I gender-bias surrogate verification (research, P1).**
+    *Status: blocked* A recent surrogate-auditing paper on
+    demographic bias in text-to-image models ("Bias before Pixels")
+    reports over 9,000 object–activity text comb0s that activities
+    shape gender bias more than objects. On release, obtain the
+    paper's models/prompts/labels and test the claim two ways:
+    (a) independent replication — fit RoT-text on prompt tokens →
+    perceived-gender labels and rank activity vs object token
+    importances; (b) second-order audit — explain their provided
+    surrogate's predictions with RoT and compare all three rankings
+    (theirs, RoT-direct, RoT-of-surrogate). Pass = agreement within
+    a pre-registered tolerance; deviations become tickets against
+    either side. Constraints: don't regenerate 9,396×images on the
+    we can explain just the 3 bias surrogates; the gender-labeling 
+    method (theirs vs ours) is itself a variable;
+    generation costs and classifier choices logged per the item-36
+    protocol. Not started.
 
 ## Release / maintenance
 
