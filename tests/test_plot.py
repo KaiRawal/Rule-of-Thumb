@@ -72,7 +72,8 @@ def _span_style(html, token):
 def test_text_html_max_tokens_truncates():
     tokens = [f"w{i}" for i in range(10)]
     importance = np.linspace(-1, 1, 10)
-    html = getattr(plot.text_html(importance, tokens, max_tokens=4), "data", "")
+    result = plot.text_html(importance, tokens, max_tokens=4)
+    html = getattr(result, "data", result)  # IPython HTML object, or a plain str without IPython
     shown = sum(1 for token in tokens if f">{token}<" in html)
     assert shown == 4
 
