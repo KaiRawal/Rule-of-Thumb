@@ -14,6 +14,7 @@ binary tasks, full per-class output for ``n_classes > 2``.
 from __future__ import annotations
 
 import functools
+import inspect
 import os
 import warnings
 from typing import Any
@@ -360,6 +361,52 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
     return explainer
 
 
+_TUNE_OPTIONS = frozenset({"space", "n_candidates", "scoring", "search", "validation_split"})
+
+
+def _tunable(modality):
+    """Give a factory ``tune=True`` (the default): search its hyperparameters via :func:`ruleofthumb.autotune`.
+
+    ``tune=True`` runs ``autotune`` with its defaults; a dict overrides
+    ``space`` / ``n_candidates`` / ``scoring`` / ``search`` /
+    ``validation_split``; ``None`` / ``False`` runs the fixed fit.
+    Hyperparameters passed explicitly are pinned: they leave the search
+    space, and when nothing is left to search the fixed fit runs. A tuned
+    fit carries ``best_params_`` / ``best_score_`` (held-out score of the
+    winner). ``autotune`` calls the undecorated factory (``__wrapped__``),
+    which is the recursion guard.
+    """
+
+    def decorate(factory):
+        @functools.wraps(factory)
+        def wrapper(y_outputs, x_inputs, *, tune=True, **kwargs):
+            if tune is None or tune is False:
+                return factory(y_outputs, x_inputs, **kwargs)
+            if tune is not True and not isinstance(tune, dict):
+                raise TypeError(f"tune must be True, False, None or a dict of autotune options, got {tune!r}")
+            options = {} if tune is True else dict(tune)
+            unknown = set(options) - _TUNE_OPTIONS
+            if unknown:
+                raise ValueError(f"unknown tune options: {sorted(unknown)}; expected a subset of {sorted(_TUNE_OPTIONS)}")
+            from ruleofthumb.tune import DEFAULT_SPACE, autotune
+
+            space = {key: values for key, values in options.pop("space", DEFAULT_SPACE).items() if key not in kwargs}
+            if not space:
+                return factory(y_outputs, x_inputs, **kwargs)
+            kwargs.setdefault("n_classes", 2)  # the factories' default, not autotune's inference
+            result = autotune(y_outputs, x_inputs, modality=modality, space=space, **options, **kwargs)
+            explainer = result.explainer
+            explainer.best_params_, explainer.best_score_ = result.best_params, result.best_score
+            return explainer
+
+        signature = inspect.signature(factory)
+        tune_param = inspect.Parameter("tune", inspect.Parameter.KEYWORD_ONLY, default=True)
+        wrapper.__signature__ = signature.replace(parameters=[*signature.parameters.values(), tune_param])
+        return wrapper
+
+    return decorate
+
+
 def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
     """Fit an :class:`Explainer` to black-box outputs, auto-detecting the modality.
 
@@ -369,7 +416,8 @@ def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
     4 → image ``(N, C, H, W)``. Pass ``modality="tabular" | "text" | "image"``
     explicitly to override. The remaining keyword arguments are forwarded to
     the matching factory (:func:`fit_tabular`, :func:`fit_text` or
-    :func:`fit_image`).
+    :func:`fit_image`), including ``tune=`` (default ``True``: search the
+    hyperparameters; ``tune=None`` runs the fixed fit).
     """
     if modality == "auto":
         if _is_path_batch(x_inputs):
@@ -387,6 +435,7 @@ def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
     return factories[modality](y_outputs, x_inputs, **kwargs)
 
 
+@_tunable("tabular")
 def fit_tabular(
     y_outputs,
     x_inputs,
@@ -418,6 +467,7 @@ def fit_tabular(
     return _attach_fit_quality(Explainer(model, "tabular"), _as_float_inputs(x_inputs), labels)
 
 
+@_tunable("text")
 def fit_text(
     y_outputs,
     x_inputs,
@@ -488,6 +538,7 @@ def fit_text(
     )
 
 
+@_tunable("image")
 def fit_image(
     y_outputs,
     x_inputs,
