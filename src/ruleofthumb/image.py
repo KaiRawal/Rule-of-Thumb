@@ -203,6 +203,10 @@ class RoTImage(RoT):
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
         imp = self.importance(points, mask=mask)
+        # One draw per pixel, (N, H, W), shared by all channels: pixels are the reveal unit, so training hides
+        # whole pixels the way scoring reveals them, with C times fewer draws (576x on MobileNet maps). The
+        # legacy code drew per (channel, pixel); a sandbox shim measured that as no different (+0.002), and
+        # switching would break every committed weight and test floor. Kept on purpose (ToDo 38).
         keep = (
             torch.rand(points.shape[0], *points.shape[2:], device=self.device) > self.dropout_rate
         ).float()

@@ -118,6 +118,10 @@ class RoTText(RoT):
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
         imp = self.importance(points, mask=mask)
+        # One draw per token, (N, T), shared by all embedding dims: tokens are the reveal unit, so training
+        # hides whole tokens the way scoring reveals them, and padded tokens stay hidden (mask below). This
+        # matches the legacy Judicial RoT_text; the legacy MovieReview copy dropped single (token, dim) values,
+        # which a sandbox shim measured as no different (+0.002). Kept on purpose (ToDo 38).
         token_dim = 1
         keep = (
             torch.rand(points.shape[0], points.shape[token_dim], device=self.device) > self.dropout_rate

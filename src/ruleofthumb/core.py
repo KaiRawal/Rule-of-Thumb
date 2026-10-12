@@ -123,6 +123,10 @@ class RoT(torch.nn.Module):
 
     def stochastic_importance(self, points, mask=None):
         imp = self.importance(points, mask=mask)
+        # Dropout hides whole reveal units, one draw per unit (tabular: per feature, (N, d), the same as the
+        # legacy code). Training then hides inputs the way scoring reveals them (unit granularity), and only
+        # whole-unit drops at rate 0.5 make every subset of revealed units equally likely. Text and image
+        # override this with per-token / per-pixel draws (ToDo 38).
         mask_shape = (points.shape[0],) + tuple(imp.shape[2:])
         keep = (torch.rand(mask_shape, device=self.device) > self.dropout_rate).float()
         return keep[:, None] * imp
