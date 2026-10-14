@@ -73,7 +73,10 @@ def test_text_html_max_tokens_truncates():
     tokens = [f"w{i}" for i in range(10)]
     importance = np.linspace(-1, 1, 10)
     result = plot.text_html(importance, tokens, max_tokens=4)
-    html = getattr(result, "data", result)  # IPython HTML object, or a plain str without IPython
+    if isinstance(result, str):  # IPython not installed: text_html returns the raw HTML string
+        html = result
+    else:  # IPython installed: text_html returns an IPython.display.HTML object
+        html = result.data
     shown = sum(1 for token in tokens if f">{token}<" in html)
     assert shown == 4
 
