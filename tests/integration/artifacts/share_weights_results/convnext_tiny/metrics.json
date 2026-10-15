@@ -1,6 +1,7 @@
 {
   "backbone": "convnext_tiny",
   "label": "convnext_tiny frozen trunk",
+  "device": "cuda",
   "feature_shape": [
     1797,
     768,
@@ -10,7 +11,7 @@
   "n_train": 1437,
   "n_test": 360,
   "majority_baseline": 0.10239287701725097,
-  "feature_extraction_secs": 416.3,
+  "feature_extraction_secs": 5.6,
   "modes": {
     "shared": {
       "a_shape": [
@@ -18,11 +19,10 @@
         768
       ],
       "parameters": 15370,
-      "params_per_train_sample": 10.7,
       "train_fidelity": 1.0,
       "test_fidelity": 0.9639,
       "generalisation_gap": 0.0361,
-      "fit_secs": 21.4
+      "fit_secs": 19.7
     },
     "unshared": {
       "a_shape": [
@@ -32,11 +32,10 @@
         7
       ],
       "parameters": 752650,
-      "params_per_train_sample": 523.8,
       "train_fidelity": 1.0,
-      "test_fidelity": 0.9889,
-      "generalisation_gap": 0.0111,
-      "fit_secs": 11.3
+      "test_fidelity": 0.9944,
+      "generalisation_gap": 0.0056,
+      "fit_secs": 12.3
     }
   }
 }
