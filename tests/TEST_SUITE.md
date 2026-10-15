@@ -143,10 +143,10 @@ the tests assert floors on. **Majority** = always-guess-commonest-class score.
 | tabular digits/RF (10-class) | 1797 | 1.0000 | 0.9694 (maj ~0.10) | `>=0.9` |
 | compas gbm / svc / mlp | 2000 | n/a (outputs only) | 0.8810 / 0.9200 / 0.8655 | `>=0.85/0.9/0.84` + priors_count top |
 | wine gbm / svc / mlp (3-class) | 178 | n/a (outputs only) | 0.9888 ×3 | `>=0.95` ×3 + shared top features |
-| image binary dense-vs-sparse | 1797 | n/a (median-split labels) | 0.9672 (maj ~0.5) | `>=0.92` (was 0.93; see §5b cross-host legs) |
+| image binary dense-vs-sparse | 1797 | n/a (median-split labels) | 0.9672 (maj ~0.5) | `>=0.93` |
 | image 10-class raw C=1 | 1797 | n/a (CNN outputs) | 0.1080 (maj 0.102) | `maj..maj+0.05` (must look bad) + top-2 `>=0.75` (CPU legs 0.84; seed-sensitive, see §5b) |
 | image 10-class coords C=3 | 1797 | n/a (CNN outputs) | 0.2944 (maj 0.102) | `>=maj+0.15` and `>=raw+0.1` |
-| image 10-class MobileNet rich | 500-slice | n/a (CNN outputs) | 1.0000 (maj ~0.10) | `>=0.88` (was 0.95; see §5b cross-host legs), `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
+| image 10-class MobileNet rich | 500-slice | n/a (CNN outputs) | 1.0000 (maj ~0.10) | `>=0.95`, `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
 | pets GPT-vs-truth / RoT-vs-GPT | 20 | 1.0000 | 1.0000 (floor `>=0.85`; heatmap corr min `>=0.95`, mean `>=0.99`; dog-mass corr `>=0.9`) | as listed |
 | HX TF-IDF/logreg box, RoT-text | 1924 | 0.7588 | 0.7646 | `>=0.72`; wAUROC 0.7056 (`>=0.65`); SHAP parity ±0.08; deletion wins +0.02 and insertion wins at k=3,10 (n=200); target slices smoke |
 | MIT1003 ResNet18, RoT-maps/pixel | 150 | n/a (API outputs) | maps 0.9533 / pixel 0.1867 | maps `>=0.90`, pixel `<=0.30` (documented collapse); pointing mob 0.34 `>=0.28`, mob > pixel, rand `<=0.15`; box-IoU mob > pixel; IG `>=0.20` / `>=0.15` (20-subset refs) |
@@ -199,13 +199,13 @@ scratch copy in which each floor assert records its value instead of
 failing, and the fit seed is set per leg. The repo tests were not edited.
 Per-leg values and scripts: `local_artifacts/todo22_probe/` (not committed).
 
-Worst value per floor (new floors in bold where changed):
+Worst value per floor (failing values in bold):
 
 | floor | test | CPU worst (host, seed) | GPU worst | floor |
 |---|---|---|---|---|
-| image binary | `test_binary_explanation_shape_and_fidelity` | 0.932 (EC2 s2) | 0.932 | **0.92** (was 0.93) |
+| image binary | `test_binary_explanation_shape_and_fidelity` | 0.932 (EC2 s2) | 0.932 | 0.93 |
 | image coords | `test_coordinate_channels_restore_multiclass_capacity` | 0.296 (Azure s0) | 0.358 | 0.252 (`maj+0.15`) |
-| image rich slice | `test_multiclass_rich_backbone_strong_accuracy` | 0.908 (EC2 s0) | 0.978 | **0.88** (was 0.95) |
+| image rich slice | `test_multiclass_rich_backbone_strong_accuracy` | **0.908** (EC2 s0) | 0.978 | 0.95 |
 | tabular binary acc | `test_binary_explanation_shape_additivity_and_fidelity` | 0.988 | 0.989 | 0.95 |
 | tabular top-8 overlap | `test_binary_top_features_match_logistic_coefficients` | 6 | 6 | 5 |
 | tabular corr | same test | 0.559 | 0.603 | 0.55 |
@@ -220,10 +220,12 @@ Worst value per floor (new floors in bold where changed):
 
 Findings:
 
-- Every floor holds on every CPU leg with the two new floors. The rich
-  slice only failed its old 0.95 floor on EC2 at seed 0 (0.908); Azure's
-  AMD CPU scored 0.992 there and the Mac 0.998, so the Intel AVX-512/AMX
-  host is the outlier.
+- Every floor holds on every CPU leg except the rich slice, which fails its
+  0.95 floor on EC2 at seed 0 (0.908); Azure's AMD CPU scored 0.992 there
+  and the Mac 0.998, so the Intel AVX-512/AMX host is the outlier. The
+  image binary floor holds by 0.002 (0.932 vs 0.93). Both floors stay as
+  they are; the fix is to make these image tests deterministic, not to
+  lower the floors.
 - Only the image path is host-sensitive. Every tabular and text value is
   identical on the Intel and AMD hosts at every seed; the image values
   differ.
