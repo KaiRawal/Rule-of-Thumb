@@ -146,6 +146,7 @@ class RoTImage(RoT):
             raise ValueError(f"unshared image sample_shape must be (channels, height, width), got {sample_shape}")
         super().__init__(classes, sample_shape, use_BCE_loss, no_a_b=True, device=device, nonlinear=nonlinear)
         self.share_weights = bool(share_weights)
+        # shared: (classes, channels); unshared: (classes, channels, height, width)
         weight_shape = (classes, sample_shape[0]) if self.share_weights else (classes, *sample_shape)
         self.a = nn.Parameter(torch.zeros(weight_shape, requires_grad=True, device=self.device))
         self.b = nn.Parameter(torch.zeros(weight_shape, requires_grad=True, device=self.device))
