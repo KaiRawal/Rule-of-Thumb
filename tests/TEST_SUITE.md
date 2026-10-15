@@ -238,9 +238,8 @@ Findings:
 Full suite on Azure with these floors: GPU present, default settings 240
 passed / 0 failed; GPU hidden 239 passed / 0 failed; `ROT_TEST_DEVICE=cuda`
 238 passed / 2 failed (the two `test_tune` searches, which are CPU-contract
-tests). `tests/conftest.py` pins fits that omit `device=` to
-`ROT_TEST_DEVICE` (default CPU); before it, a GPU host auto-selected CUDA
-for those unit fits and failed the same two tests under default settings.
+tests). Those two tests now pass `device="cpu"` explicitly; without it, a GPU
+host auto-selects CUDA for their fits and fails them under default settings.
 
 Gate note (not committed as a test): TinyCNN-trunk `(500,8,8,8)` maps as a
 backbone reached only ~0.49 on 10-class digits, so the committed rich test
