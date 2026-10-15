@@ -26,7 +26,10 @@ EPOCHS = 300
 BATCH = 5000
 LR = 0.05
 N_SALIENCY = 8
+SHOW = 128
+CAPTION = "red = pushes the score toward the predicted class, blue = pushes against it"
 EXPECTED_N = 1797
+# DIGITS32 = "digits_image32.npz"  # UCI 32x32 originals of the same digits, in x_multi order
 
 ALL_BACKBONES = ["raw", "coords", "mobilenet_v3_small", "resnet18", "convnext_tiny", "efficientnet_b0"]
 
@@ -100,12 +103,27 @@ def _tv_features(x_gray, builder, weights, extract, device):
     return np.concatenate(out, 0)
 
 
+# 32x32 input (disabled): UCI's 32x32 originals of the same digits.
+# def load_digits_gray(data, resolution):
+#     if resolution == 8:
+#         return data["x_multi"].astype(np.float32)
+#     return np.load(os.path.join(ARTIFACTS, DIGITS32))["x_multi32"].astype(np.float32)
+#
+#
+# def coord_channels(x_gray):
+#     rows, cols = np.mgrid[0 : x_gray.shape[2], 0 : x_gray.shape[3]]
+#     rows, cols = rows / (x_gray.shape[2] - 1), cols / (x_gray.shape[3] - 1)
+#     return np.concatenate([x_gray, rows[None] * x_gray, cols[None] * x_gray], axis=1).astype(np.float32)
+
+
 def build_inputs(name, data, device):
     x_gray = data["x_multi"].astype(np.float32)
     y = data["y_multi"].astype(np.int64)
 
     if name == "raw":
         return x_gray, y, "raw pixels (C=1)"
+    # if name == "coords" and x_gray.shape[-1] != 8:  # 32x32 input
+    #     return coord_channels(x_gray), y, "coordinate channels (C=3)"
     if name == "coords":
         return data["x_coords"].astype(np.float32), data["y_coords"].astype(np.int64), "coordinate channels (C=3)"
     if name not in SPECS:
@@ -127,6 +145,11 @@ def split(y):
     return np.sort(np.concatenate(train)), np.sort(np.concatenate(test))
 
 
+def _upscale(a):
+    t = torch.from_numpy(np.asarray(a, dtype=np.float32))[None, None]
+    return torch.nn.functional.interpolate(t, size=(SHOW, SHOW), mode="bilinear", align_corners=False)[0, 0].numpy()
+
+
 def save_saliency(exp, x_test, y_test, digits_gray, test_idx, out_dir, mode):
     os.makedirs(out_dir, exist_ok=True)
     sel = np.arange(min(N_SALIENCY, len(x_test)))
@@ -134,17 +157,15 @@ def save_saliency(exp, x_test, y_test, digits_gray, test_idx, out_dir, mode):
     pred = exp.predict(x_test[sel]).numpy()
     for j in sel:
         heat = imp[j, pred[j]] if imp.ndim == 4 else imp[j]
-        heat_t = torch.from_numpy(np.asarray(heat, dtype=np.float32))[None, None]
-        heat_big = torch.nn.functional.interpolate(heat_t, size=(64, 64), mode="bilinear", align_corners=False)[0, 0]
-        digit_t = torch.from_numpy(digits_gray[test_idx[j], 0].astype(np.float32))[None, None]
-        digit_big = torch.nn.functional.interpolate(digit_t, size=(64, 64), mode="nearest")[0, 0].numpy()
-        rgb = np.repeat(digit_big[:, :, None], 3, axis=2)
-        rgb = (rgb - rgb.min()) / max(float(np.ptp(rgb)), 1e-8)
-        ax = rot_plot.saliency(heat_big.numpy(), image=rgb, power=0.7)
+        digit = _upscale(digits_gray[test_idx[j], 0])
+        digit = (digit - digit.min()) / max(float(np.ptp(digit)), 1e-8)
+        background = np.repeat((1.0 - 0.55 * digit)[:, :, None], 3, axis=2)  # dark ink on white
+        ax = rot_plot.saliency(_upscale(heat), image=background, power=0.7)
         fig = ax.get_figure() if hasattr(ax, "get_figure") else plt.gcf()
         fig.suptitle(f"{mode} | true={y_test[j]} pred={pred[j]}", fontsize=9)
+        fig.text(0.5, 0.0, CAPTION, ha="center", va="top", fontsize=7)
         fig.savefig(
-            os.path.join(out_dir, f"{mode}_{j:02d}_true{y_test[j]}_pred{pred[j]}.png"), dpi=110, bbox_inches="tight"
+            os.path.join(out_dir, f"{mode}_{j:02d}_true{y_test[j]}_pred{pred[j]}.png"), dpi=120, bbox_inches="tight"
         )
         plt.close(fig)
 
@@ -152,6 +173,7 @@ def save_saliency(exp, x_test, y_test, digits_gray, test_idx, out_dir, mode):
 def run_backbone(name, out_root, device):
     data = np.load(os.path.join(ARTIFACTS, "digits_image.npz"))
     digits_gray = data["x_multi"].astype(np.float32)
+    # digits_gray = load_digits_gray(data, resolution)  # 32x32 input
     t0 = time.time()
     x, y, label = build_inputs(name, data, device)
     feat_secs = time.time() - t0
@@ -241,6 +263,7 @@ def main():
     ap.add_argument("--backbones", nargs="+", default=ALL_BACKBONES, help=f"subset of {ALL_BACKBONES}")
     ap.add_argument("--device", default="auto", help="auto (default) | cuda | mps | cpu")
     ap.add_argument("--out", default=DEFAULT_OUT)
+    # ap.add_argument("--resolution", type=int, choices=(8, 32), default=8, help=f"8 (default) or 32 (needs {DIGITS32})")
     args = ap.parse_args()
 
     preflight()
