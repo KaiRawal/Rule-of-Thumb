@@ -382,6 +382,56 @@ are provenance notes only; the legacy code did not move with the package.
     generation costs and classifier choices logged per the item-36
     protocol. Not started.
 
+43. **Dropout–interpretability trade-off via TERP (research, P2).**
+    Audit question: does RoT score well on the TERP eval metric
+    (Mehdi & Tiwary, `s41467-024-51970-x`), especially at high
+    feature-dropout rates, and does the RoT fit-quality vs TERP
+    trade-off select a better explainer than fit-quality alone?
+    Background: RoT minimises expected loss over feature subsets
+    with inclusion probability `p` (`appendices.tex:172-182`);
+    the package fixes `dropout_rate = 1 - p = 0.5` as a method
+    constant (`core.py:85`, per-token `text.py:123`, per-pixel
+    `image.py:207`, two-stage pretrain-at-0 `core.py:221-224`),
+    pinned non-tunable (`tests/test_tune.py:186`, item 28) —
+    legacy constructors accepted `dropout_rate`
+    (`AdversarialAttack/rot_class.py:7`). TERP defines, for local
+    linear weights `f` with `p_k = |f_k| / sum|f|`,
+    interpretation entropy `S = -sum p log p / log n`,
+    unfaithfulness `U = 1 - |C(F,g)|`, free energy
+    `zeta^j = U^j + theta * S^j` over forward-selected `j`,
+    with characteristic `theta^j = -DeltaU^j / DeltaS^j` and
+    optimal `j` maximising `(theta^{j+1} - theta^j)`;
+    neighbourhoods are LIME-like (uniform perturb at `>= 0.5`,
+    LDA-projected similarity, `sigma = 1`). Hypothesis:
+    high dropout trains on sparse subsets so weights peak on
+    marginally predictive features (low `S`, higher `U`);
+    low dropout fits joint behaviour (low `U`, diffuse `S`);
+    `zeta` minima should sit mid-to-high dropout while
+    `train_agreement_` peaks lower — making `zeta` a candidate
+    explainer-selection metric. Exploratory protocol, no
+    implementation commitment: (1) read-only TERP mapping from
+    frozen RoT outputs — `S` over reveal units (tabular features;
+    text token-sums; image pixel-sums) vs over raw `E/C` dims,
+    `U^j` from truncated top-`j` surrogate scores via the
+    existing `ordered_predict` curve, documented per choice;
+    (2) dropout sweep behind a flag (e.g.
+    `[0.0, 0.1, 0.3, 0.5, 0.7, 0.9]`, seeded) on committed
+    integration artifacts only — never retrain black boxes or
+    download datasets — recording `train_agreement_`, `S`, `U`,
+    `zeta`, reveal AUC vs seeded random; (3) compare
+    `argmin zeta` vs `argmax agreement` as `autotune` scoring
+    candidates (cf. items 30/37). Caveats: TERP Thm 1–2 assume
+    independent features (RoT inputs are correlated); pooled
+    text/image weights and length normalisation break
+    additivity; global-RoT vs local-TERP mismatch is itself a
+    finding; cross-ref items 23 (stability), 24 (fidelity vs
+    plausibility), 28/38 (dropout constancy/granularity), 36
+    (artifact-only protocol). Done when a spike notebook/script
+    reports `U`-vs-`S`, `zeta`-vs-dropout, and
+    agreement-vs-`zeta` scatters with controls, and the outcome
+    is recorded here as adopt, reject, or follow-up ticket.
+    Not started.
+
 ## Release / maintenance
 
 18. PyPI release checklist: three-place version bump (`pyproject.toml`,
