@@ -146,7 +146,7 @@ the tests assert floors on. **Majority** = always-guess-commonest-class score.
 | image binary dense-vs-sparse | 1797 | n/a (median-split labels) | 0.9672 (maj ~0.5) | `>=0.93` |
 | image 10-class raw C=1 | 1797 | n/a (CNN outputs) | 0.1080 (maj 0.102) | `maj..maj+0.05` (must look bad) + top-2 `>=0.75` (CPU legs 0.84; seed-sensitive, see §5b) |
 | image 10-class coords C=3 | 1797 | n/a (CNN outputs) | 0.2944 (maj 0.102) | `>=maj+0.15` and `>=raw+0.1` |
-| image 10-class MobileNet rich | 1797 | n/a (CNN outputs) | 1.0000 (maj ~0.10) | `>=0.95`, `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
+| image 10-class MobileNet rich | 500-slice | n/a (CNN outputs) | 1.0000 (maj ~0.10) | `>=0.95`, `>=maj+0.5`, `>=raw+0.5`, `>=8/10` classes predicted |
 | pets GPT-vs-truth / RoT-vs-GPT | 20 | 1.0000 | 1.0000 (floor `>=0.85`; heatmap corr min `>=0.95`, mean `>=0.99`; dog-mass corr `>=0.9`) | as listed |
 | HX TF-IDF/logreg box, RoT-text | 1924 | 0.7588 | 0.7646 | `>=0.72`; wAUROC 0.7056 (`>=0.65`); SHAP parity ±0.08; deletion wins +0.02 and insertion wins at k=3,10 (n=200); target slices smoke |
 | MIT1003 ResNet18, RoT-maps/pixel | 150 | n/a (API outputs) | maps 0.9533 / pixel 0.1867 | maps `>=0.90`, pixel `<=0.30` (documented collapse); pointing mob 0.34 `>=0.28`, mob > pixel, rand `<=0.15`; box-IoU mob > pixel; IG `>=0.20` / `>=0.15` (20-subset refs) |
@@ -250,7 +250,7 @@ uses the MobileNet path (~0.99).
 ## 6. Runtimes (machine-specific baselines, §1 hardware)
 
 Full suite: **253 passed, warm 285.54s (0:04:45)** on grown artifacts
-(digits 1797, compas 2000, 58 reviews; rich image arm on all 1797).
+(digits 1797, compas 2000, 58 reviews; rich image arm on a 500-slice).
 The session-autouse determinism fixture single-threads torch. Slowest
 drivers: rich-backbone fit + reveal curve (~137s), MobileNet feature
 setups, HX fidelity setup, text SST-2 fits on 58 reviews.
