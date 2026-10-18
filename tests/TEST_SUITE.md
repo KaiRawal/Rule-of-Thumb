@@ -183,66 +183,6 @@ holds within host); seed and backend legs spread as follows
   collapse pattern below ulp level. MPS runs are exploratory-only
   (see `development.md`); the suite contract is CPU.
 
-### Cross-host legs (2026-09-28/29)
-
-The legs above were all on one Mac. They were re-run on two more CPU
-families and one GPU, with CI's pinned `requirements.txt` (torch 2.13.0,
-numpy 2.2.6, scikit-learn 1.7.2), Python 3.12, multi-threaded:
-
-- **EC2**: Intel Xeon Platinum 8488C (AVX-512, AMX), CPU only. Seeds 0 to 3
-  on 7 threads, plus seed 0 on 1 thread.
-- **Azure**: AMD EPYC 9V84 (AVX-512), CPU. Seeds 0 to 2 on 13 threads.
-- **Azure**: NVIDIA H100 NVL, `ROT_TEST_DEVICE=cuda`. Seeds 0 to 2.
-
-Method: the four integration files with `ensemble` floors were run from a
-scratch copy in which each floor assert records its value instead of
-failing, and the fit seed is set per leg. The repo tests were not edited.
-Per-leg values and scripts: `local_artifacts/todo22_probe/` (not committed).
-
-Worst value per floor (failing values in bold):
-
-| floor | test | CPU worst (host, seed) | GPU worst | floor |
-|---|---|---|---|---|
-| image binary | `test_binary_explanation_shape_and_fidelity` | 0.932 (EC2 s2) | 0.932 | 0.93 |
-| image coords | `test_coordinate_channels_restore_multiclass_capacity` | 0.296 (Azure s0) | 0.358 | 0.252 (`maj+0.15`) |
-| image rich slice | `test_multiclass_rich_backbone_strong_accuracy` | **0.908** (EC2 s0) | 0.978 | 0.95 |
-| tabular binary acc | `test_binary_explanation_shape_additivity_and_fidelity` | 0.988 | 0.989 | 0.95 |
-| tabular top-8 overlap | `test_binary_top_features_match_logistic_coefficients` | 6 | 6 | 5 |
-| tabular corr | same test | 0.559 | 0.603 | 0.55 |
-| tabular multiclass acc | `test_multiclass_explanation_shape_and_fidelity` | 0.968 | 0.967 | 0.9 |
-| wine top-3 overlap | `test_wine_models_share_the_same_dominant_features` | 3 | 3 | 3 |
-| breast-cancer RF linear | `test_breast_cancer_fidelity_and_rank_agreement` | 0.965 | 0.965 | 0.9 |
-| breast-cancer RF rbf | same test | 0.951 | 0.965 | 0.9 |
-| breast-cancer spearman | same test | 0.598 | 0.588 | `>0.5` |
-| text pos rate | `test_top_tokens_carry_sentiment_words` | 0.517 | 0.621 | 0.5 |
-| text neg rate | same test | 0.655 | **0.586** | 0.6 |
-| text full curve | `test_reveal_curve_recovers_full_accuracy` | 1.0 | 1.0 | 0.95 |
-
-Findings:
-
-- Every floor holds on every CPU leg except the rich slice, which fails its
-  0.95 floor on EC2 at seed 0 (0.908); Azure's AMD CPU scored 0.992 there
-  and the Mac 0.998, so the Intel AVX-512/AMX host is the outlier. The
-  image binary floor holds by 0.002 (0.932 vs 0.93). Both floors stay as
-  they are; the fix is to make these image tests deterministic, not to
-  lower the floors.
-- Only the image path is host-sensitive. Every tabular and text value is
-  identical on the Intel and AMD hosts at every seed; the image values
-  differ.
-- Threads 1 vs 7 were identical on every floor on EC2, matching the Mac.
-- GPU (exploratory, not the suite contract): text neg rate dips to 0.586
-  at seed 2, below its 0.6 floor. The floor is left at 0.6 because the
-  contract is CPU; running the suite on CUDA can fail here.
-- Top-2 collapse coverage failed its 0.75 floor at seed 1 on every host
-  (EC2 0.554, Azure CPU 0.546, H100 0.620), as documented above. At seed 0,
-  the seed the tests use, it passes on every host.
-
-Full suite on Azure with these floors: GPU present, default settings 240
-passed / 0 failed; GPU hidden 239 passed / 0 failed; `ROT_TEST_DEVICE=cuda`
-238 passed / 2 failed (the two `test_tune` searches, which are CPU-contract
-tests). Those two tests now pass `device="cpu"` explicitly; without it, a GPU
-host auto-selects CUDA for their fits and fails them under default settings.
-
 Gate note (not committed as a test): TinyCNN-trunk `(500,8,8,8)` maps as a
 backbone reached only ~0.49 on 10-class digits, so the committed rich test
 uses the MobileNet path (~0.99).
