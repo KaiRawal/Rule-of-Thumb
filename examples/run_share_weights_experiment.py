@@ -15,7 +15,6 @@ from PIL import Image
 from torchvision import models as tv
 
 from ruleofthumb import fit_image
-from ruleofthumb import plot as rot_plot
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARTIFACTS = os.path.join(REPO, "tests", "integration", "artifacts")
@@ -27,7 +26,7 @@ BATCH = 5000
 LR = 0.05
 N_SALIENCY = 8
 SHOW = 128
-CAPTION = "red = pushes the score toward the predicted class, blue = pushes against it"
+CAPTION = "blue = large importance (salient), red = small importance; colour shows size, not direction"
 EXPECTED_N = 1797
 # DIGITS32 = "digits_image32.npz"  # UCI 32x32 originals of the same digits, in x_multi order
 
@@ -157,11 +156,13 @@ def save_saliency(exp, x_test, y_test, digits_gray, test_idx, out_dir, mode):
     pred = exp.predict(x_test[sel]).numpy()
     for j in sel:
         heat = imp[j, pred[j]] if imp.ndim == 4 else imp[j]
-        digit = _upscale(digits_gray[test_idx[j], 0])
-        digit = (digit - digit.min()) / max(float(np.ptp(digit)), 1e-8)
-        background = np.repeat((1.0 - 0.55 * digit)[:, :, None], 3, axis=2)  # dark ink on white
-        ax = rot_plot.saliency(_upscale(heat), image=background, power=0.7)
-        fig = ax.get_figure() if hasattr(ax, "get_figure") else plt.gcf()
+        # importance size only (sign dropped), scaled per figure with the top 2% clipped like plot.saliency
+        size = np.abs(_upscale(heat))
+        size = np.clip(size / max(float(np.percentile(size, 98)), 1e-8), 0.0, 1.0)
+        fig, ax = plt.subplots(figsize=(5, 5))
+        ax.imshow(size, cmap="RdBu", vmin=0, vmax=1)  # red = small, white = middle, blue = large
+        ax.axis("off")
+        fig.tight_layout(pad=0)
         fig.suptitle(f"{mode} | true={y_test[j]} pred={pred[j]}", fontsize=9)
         fig.text(0.5, 0.0, CAPTION, ha="center", va="top", fontsize=7)
         fig.savefig(
