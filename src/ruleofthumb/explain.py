@@ -538,6 +538,17 @@ def fit_text(
     )
 
 
+def _path_loader(backbone, size, transform):
+    """Loader for image file paths plus the backbone id recorded for provenance."""
+    if backbone == "auto":
+        backbone = DEFAULT_IMAGE_MODEL
+    if backbone is None:
+        return functools.partial(load_images, size=size, transform=transform), None
+    if transform is not None:
+        raise ValueError("backbone owns preprocessing; pass transform=None or backbone=None")
+    return functools.partial(embed_images, backbone=backbone, size=size), backbone if isinstance(backbone, str) else None
+
+
 @_tunable("image")
 def fit_image(
     y_outputs,
@@ -587,15 +598,7 @@ def fit_image(
     if _is_string_batch(x_inputs):
         if mask is not None:
             raise ValueError("raw image files derive their padding automatically; pass mask=None")
-        if backbone == "auto":
-            backbone = DEFAULT_IMAGE_MODEL
-        if backbone is None:
-            image_loader = functools.partial(load_images, size=size, transform=transform)
-        else:
-            if transform is not None:
-                raise ValueError("backbone owns preprocessing; pass transform=None or backbone=None")
-            image_loader = functools.partial(embed_images, backbone=backbone, size=size)
-            backbone_id = backbone if isinstance(backbone, str) else None
+        image_loader, backbone_id = _path_loader(backbone, size, transform)
         loaded = image_loader(list(x_inputs))
         x_inputs = loaded.maps if hasattr(loaded, "maps") else loaded.images
         mask = torch.from_numpy(loaded.mask)

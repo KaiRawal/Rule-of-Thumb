@@ -186,6 +186,22 @@ def test_numpy_string_arrays_route_to_text(stubs):
     assert np.array_equal(exp.get_order(arr), exp.get_order(texts))
 
 
+def test_tuned_strings_embed_once_for_the_search(stubs):
+    """Candidates share one embedding pass; only the final refit embeds again."""
+    from ruleofthumb import autotune
+
+    tokenizer, model = stubs
+    calls = []
+    model.register_forward_hook(lambda *_: calls.append(1))
+    texts = ["a bb", "ccc", "dddd ee", "f", "gg hh", "iii"]
+    result = autotune(
+        np.array([0, 1, 0, 1, 0, 1]), texts, tokenizer=tokenizer, model=model, space={"epochs": [2, 3, 4]}, seed=0
+    )
+    assert len(result.trials) == 3
+    assert len(calls) == 2
+    assert result.explainer.predict(texts).shape[0] == 6
+
+
 def test_strings_with_explicit_padding_rejected(stubs):
     from ruleofthumb import fit_text
 
