@@ -17,7 +17,16 @@ from typing import Any
 import numpy as np
 import torch
 
-from ruleofthumb.explain import Explainer, _is_path_batch, _is_string_batch, fit_image, fit_tabular, fit_text
+from ruleofthumb.embed import embed_texts
+from ruleofthumb.explain import (
+    Explainer,
+    _is_path_batch,
+    _is_string_batch,
+    _path_loader,
+    fit_image,
+    fit_tabular,
+    fit_text,
+)
 
 DEFAULT_SPACE = {
     "learning_rate": [0.003, 0.01, 0.03, 0.1],
@@ -26,7 +35,9 @@ DEFAULT_SPACE = {
     "weight_decay": [0.0, 0.01, 0.05],
 }
 
-_FACTORIES = {"tabular": fit_tabular, "text": fit_text, "image": fit_image}
+# the undecorated factories: candidates never tune again (recursion guard for ``tune=True``)
+_FACTORIES = {"tabular": fit_tabular.__wrapped__, "text": fit_text.__wrapped__, "image": fit_image.__wrapped__}
+_LOADER_KWARGS = ("tokenizer", "model", "backbone", "size", "transform")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -109,6 +120,23 @@ def _split_kwargs(kwargs, indices, n):
     return {key: _split_value(value, indices, n) for key, value in kwargs.items()}
 
 
+def _embed_once(modality, x_inputs, model_kwargs, device):
+    """Embed raw strings / image paths once so candidates fit arrays instead of re-embedding each time."""
+    if modality == "text":
+        embedded = embed_texts(
+            list(x_inputs), tokenizer=model_kwargs.get("tokenizer"), model=model_kwargs.get("model"), device=device
+        )
+        arrays, mask = embedded.embeddings, embedded.attention_mask
+    else:
+        loader, _ = _path_loader(
+            model_kwargs.get("backbone", "auto"), model_kwargs.get("size"), model_kwargs.get("transform")
+        )
+        loaded = loader(list(x_inputs))
+        arrays, mask = (loaded.maps if hasattr(loaded, "maps") else loaded.images), loaded.mask
+    kwargs = {key: value for key, value in model_kwargs.items() if key not in _LOADER_KWARGS}
+    return arrays, {**kwargs, "mask": mask}
+
+
 def _agreement_score(explainer, x_val, y_val, mask=None):
     """Plain held-out agreement: surrogate predictions vs black-box labels.
 
@@ -160,7 +188,9 @@ def autotune(
     Args:
         y_outputs: black-box outputs; same semantics as the factories.
         x_inputs: arrays or raw strings / file paths (native ingestion is
-            supported; padding masks are derived automatically).
+            supported; padding masks are derived automatically). Strings /
+            paths are embedded once for all candidates; the final refit
+            embeds them again so the explainer accepts them back.
         modality: ``"auto"`` detects from the input, like :func:`ruleofthumb.fit`.
         search: ``"random"`` samples ``n_candidates`` unique combinations;
             ``"grid"`` enumerates every combination in ``space``.
@@ -199,7 +229,10 @@ def autotune(
 
     modality = _resolve_modality(x_inputs, modality)
     factory = _FACTORIES[modality]
-    inputs = list(x_inputs) if _is_string_batch(x_inputs) else np.asarray(x_inputs)
+    if _is_string_batch(x_inputs):
+        inputs, candidate_kwargs = _embed_once(modality, x_inputs, model_kwargs, device)
+    else:
+        inputs, candidate_kwargs = np.asarray(x_inputs), model_kwargs
     labels = np.asarray(y_outputs).flatten()
     if n_classes is None:
         n_classes = len(np.unique(labels))
@@ -207,8 +240,8 @@ def autotune(
     train_idx, val_idx = _split(len(inputs), validation_split, seed)
     x_train, y_train = _subset(inputs, train_idx), labels[train_idx]
     x_val, y_val = _subset(inputs, val_idx), labels[val_idx]
-    train_kwargs = _split_kwargs(model_kwargs, train_idx, len(inputs))
-    val_mask = _split_value(model_kwargs.get("mask"), val_idx, len(inputs))
+    train_kwargs = _split_kwargs(candidate_kwargs, train_idx, len(inputs))
+    val_mask = _split_value(candidate_kwargs.get("mask"), val_idx, len(inputs))
 
     trials = []
     for i, params in enumerate(_candidates(space, search, n_candidates, seed)):
