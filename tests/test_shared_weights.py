@@ -81,3 +81,41 @@ def test_facade_accepts_unshared_weights_and_persists_them(tmp_path):
     loaded = load_explainer(path)
     assert loaded.model.share_weights is False
     assert np.allclose(image_exp.get_explanation(image_x), loaded.get_explanation(image_x))
+
+
+def test_weights_are_shared_by_default():
+    # ToDo 16 keeps shared weights the default: one weight per channel / embedding dim,
+    # not per position. fit_image/fit_text are the user-facing entry points.
+    rng = np.random.RandomState(0)
+    image_x = rng.randn(8, 1, 2, 3).astype(np.float32)
+    image_y = (image_x[:, 0, 0, 0] > 0).astype(np.int64)
+    image_exp = fit_image(image_y, image_x, epochs=2, pretrain_epochs=0, batch_size=8,
+                          learning_rate=0.01, weight_decay=0, seed=0)
+    assert image_exp.model.share_weights is True
+    assert tuple(image_exp.model.a.shape) == (2, 1)  # per channel; unshared would be (2, 1, 2, 3)
+
+    text_x = rng.randn(10, 3, 2).astype(np.float32)
+    text_y = (text_x[:, 0, 0] > 0).astype(np.int64)
+    text_exp = fit_text(text_y, text_x, epochs=2, pretrain_epochs=0, batch_size=10,
+                        learning_rate=0.01, l1_penalty=0, weight_decay=0, seed=0)
+    assert text_exp.model.share_weights is True
+    assert tuple(text_exp.model.a.shape) == (2, 2)  # per embedding dim; unshared would be (2, 3, 2)
+
+
+def test_unshared_image_all_masked_position_does_not_nan():
+    # Regression for e06e1df: a position masked in every sample gave an inverted
+    # bound -> b=-inf -> NaN that spread to every weight. nan_to_num zeroes it.
+    rng = np.random.RandomState(0)
+    x = rng.randn(8, 1, 2, 3).astype(np.float32)
+    y = (x[:, 0, 0, 0] > 0).astype(np.int64)
+    mask = np.ones((8, 2, 3), dtype=bool)
+    mask[:, 1, 2] = False  # padding in every sample
+
+    exp = fit_image(y, x, mask=mask, share_weights=False, epochs=3, pretrain_epochs=0,
+                    batch_size=8, learning_rate=0.01, weight_decay=0, seed=0)
+    assert torch.isfinite(exp.model.a).all()
+    assert torch.isfinite(exp.model.b).all()
+
+    imp = exp.get_explanation(x, mask=mask)  # (N, H, W) for the binary reduction
+    assert np.isfinite(imp).all()
+    assert np.allclose(imp[:, 1, 2], 0)  # masked position carries zero importance
