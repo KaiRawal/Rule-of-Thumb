@@ -88,11 +88,12 @@ def test_search_finds_a_genuinely_good_fit():
         "epochs": [1, 200],
         "weight_decay": [0.0],
     }
-    result = autotune(y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0)
+    # CPU pinned: CUDA draws different random numbers from the same seed, and these floors are measured on CPU
+    result = autotune(y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0, device="cpu")
 
     assert result.best_score >= 0.85
 
-    bad = fit_tabular(y, x, epochs=1, batch_size=64, learning_rate=1e-5, weight_decay=0.05, seed=0)
+    bad = fit_tabular(y, x, epochs=1, batch_size=64, learning_rate=1e-5, weight_decay=0.05, seed=0, device="cpu")
     bad_preds = np.asarray(bad.predict(torch.from_numpy(x)).cpu())
     bad_score = float((bad_preds == y).mean())
     assert result.best_score >= bad_score + 0.15
@@ -108,8 +109,17 @@ def test_reveal_scoring_is_opt_in():
         "epochs": [1, 200],
         "weight_decay": [0.0],
     }
+    # CPU pinned, as in test_search_finds_a_genuinely_good_fit
     result = autotune(
-        y, x, modality="tabular", search="grid", space=space, validation_split=0.25, seed=0, scoring="reveal"
+        y,
+        x,
+        modality="tabular",
+        search="grid",
+        space=space,
+        validation_split=0.25,
+        seed=0,
+        scoring="reveal",
+        device="cpu",
     )
 
     assert result.best_score >= 0.85
