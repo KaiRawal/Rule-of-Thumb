@@ -388,9 +388,9 @@ def _tunable(modality):
             unknown = set(options) - _TUNE_OPTIONS
             if unknown:
                 raise ValueError(f"unknown tune options: {sorted(unknown)}; expected a subset of {sorted(_TUNE_OPTIONS)}")
-            from ruleofthumb.tune import DEFAULT_SPACE, autotune
+            from ruleofthumb.tune import DEFAULT_SPACES, autotune
 
-            space = {key: values for key, values in options.pop("space", DEFAULT_SPACE).items() if key not in kwargs}
+            space = {key: values for key, values in options.pop("space", DEFAULT_SPACES[modality]).items() if key not in kwargs}
             if not space:
                 return factory(y_outputs, x_inputs, **kwargs)
             kwargs.setdefault("n_classes", 2)  # the factories' default, not autotune's inference

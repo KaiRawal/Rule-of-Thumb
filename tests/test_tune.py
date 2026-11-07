@@ -214,3 +214,58 @@ def test_autotune_forwards_model_kwargs():
 
     assert result.explainer.model.nonlinear_spec is not None
     assert set(result.best_params) == set(space)
+
+
+def test_default_space_is_modality_aware():
+    from ruleofthumb.tune import DEFAULT_SPACES
+
+    assert "l1_penalty" in DEFAULT_SPACES["text"]  # text can search it
+    assert "l1_penalty" not in DEFAULT_SPACES["tabular"]  # tabular factory has no such knob
+    x, y = _separable_dataset()
+    with pytest.raises(ValueError, match="unknown hyperparameters in space for tabular"):
+        autotune(y, x, modality="tabular", space={"l1_penalty": [0.0]}, seed=0)
+
+
+def test_oom_candidate_is_skipped_and_search_survives(monkeypatch):
+    from ruleofthumb import tune
+
+    x, y = _separable_dataset()
+    good = tune._FACTORIES["tabular"]
+
+    def flaky(*args, **kwargs):  # lr 0.1 candidates OOM; the rest fit fine
+        if kwargs.get("learning_rate") == 0.1:
+            raise RuntimeError("CUDA out of memory")
+        return good(*args, **kwargs)
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", flaky)
+    space = {"learning_rate": [0.05, 0.1], "epochs": [100], "batch_size": [64]}
+    result = autotune(y, x, modality="tabular", search="grid", space=space, seed=0)
+
+    assert any(t["score"] == float("-inf") and "error" in t for t in result.trials)  # OOM one recorded, not fatal
+    assert result.best_params["learning_rate"] == 0.05  # the good one wins
+
+
+def test_non_oom_error_propagates(monkeypatch):
+    from ruleofthumb import tune
+
+    def bad_kwarg(*args, **kwargs):
+        raise TypeError("unexpected keyword")  # a real bug, not OOM: must not be swallowed
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", bad_kwarg)
+    x, y = _separable_dataset()
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        autotune(y, x, modality="tabular", search="grid",
+                 space={"learning_rate": [0.05], "epochs": [100], "batch_size": [64]}, seed=0)
+
+
+def test_all_candidates_oom_raises(monkeypatch):
+    from ruleofthumb import tune
+
+    def oom(*args, **kwargs):
+        raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", oom)
+    x, y = _separable_dataset()
+    with pytest.raises(RuntimeError, match="every autotune candidate failed"):
+        autotune(y, x, modality="tabular", search="grid",
+                 space={"learning_rate": [0.05], "epochs": [100], "batch_size": [64]}, seed=0)

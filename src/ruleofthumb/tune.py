@@ -1,11 +1,13 @@
 """Automatic hyperparameter tuning for RoT explainers.
 
 Keras-tuner-style search over the exposed training hyperparameters
-(``learning_rate``, ``batch_size``, ``epochs``, ``weight_decay``):
-candidates are fitted on a seeded train split, scored on held-out data
-(by plain agreement unless ``scoring="reveal"`` is named), and the
-winner is refit on all data. Dropout is
-a fixed method constant (0.5) and is never searched.
+(``learning_rate``, ``batch_size``, ``epochs``, ``weight_decay``, plus
+``l1_penalty`` for text): candidates are fitted on a seeded train split,
+scored on held-out data (by plain agreement unless ``scoring="reveal"`` is
+named), and the winner is refit on all data. The default search space is
+per-modality (:data:`DEFAULT_SPACES`) so each one reaches its own working
+regime. A candidate that errors out (e.g. OOM) is recorded and skipped, not
+fatal. Dropout is a fixed method constant (0.5) and is never searched.
 """
 
 from __future__ import annotations
@@ -28,11 +30,29 @@ from ruleofthumb.explain import (
     fit_text,
 )
 
-DEFAULT_SPACE = {
-    "learning_rate": [0.003, 0.01, 0.03, 0.1],
-    "batch_size": [64, 500, 2000],
-    "epochs": [100, 300, 600],
-    "weight_decay": [0.0, 0.01, 0.05],
+# Per-modality so the search can actually reach each one's working regime: text needs
+# much smaller learning rates and batches (and l1 off), tabular needs the low rates and
+# long fits the papers used. Ranges, not exact paper lookups.
+DEFAULT_SPACES = {
+    "tabular": {
+        "learning_rate": [0.005, 0.01, 0.05, 0.1],
+        "batch_size": [64, 500, 2000],
+        "epochs": [100, 500, 1500],
+        "weight_decay": [0.0, 0.01, 0.05],
+    },
+    "text": {
+        "learning_rate": [1e-6, 1e-5, 1e-4, 0.01],
+        "batch_size": [16, 32, 64],
+        "epochs": [35, 100, 300],
+        "weight_decay": [0.0, 0.01],
+        "l1_penalty": [0.0, 0.01],
+    },
+    "image": {
+        "learning_rate": [0.003, 0.01, 0.05],
+        "batch_size": [500, 2000, 5000],
+        "epochs": [100, 300, 600],
+        "weight_decay": [0.0, 0.01, 0.05],
+    },
 }
 
 # the undecorated factories: candidates never tune again (recursion guard for ``tune=True``)
@@ -101,6 +121,14 @@ def _subset(inputs, indices):
     if isinstance(inputs, list):
         return [inputs[i] for i in indices]
     return inputs[indices]
+
+
+def _is_oom(exc):
+    """True for an out-of-memory error (CUDA or CPU); the only candidate failure autotune skips."""
+    if isinstance(exc, MemoryError):
+        return True
+    message = str(exc).lower()
+    return isinstance(exc, RuntimeError) and any(s in message for s in ("out of memory", "allocate"))
 
 
 def _split_value(value, indices, n):
@@ -196,7 +224,7 @@ def autotune(
             ``"grid"`` enumerates every combination in ``space``.
         n_candidates: number of random-search candidates.
         space: hyperparameter search space; defaults to
-            :data:`DEFAULT_SPACE`. Keys must be a subset of it.
+            the modality's entry in :data:`DEFAULT_SPACES`. Keys must be a subset of it.
         validation_split: fraction of samples held out for scoring.
         scoring: ``"agreement"`` (default) scores candidates by plain
             held-out surrogate-vs-label agreement, running no reveal
@@ -222,13 +250,14 @@ def autotune(
         raise ValueError(f"unknown scoring: {scoring!r}; expected one of {sorted(_SCORINGS)}")
     if not 0 < validation_split < 1:
         raise ValueError("validation_split must be in (0, 1)")
-    space = DEFAULT_SPACE if space is None else space
-    unknown = set(space) - set(DEFAULT_SPACE)
-    if unknown:
-        raise ValueError(f"unknown hyperparameters in space: {sorted(unknown)}")
 
     modality = _resolve_modality(x_inputs, modality)
     factory = _FACTORIES[modality]
+    default = DEFAULT_SPACES[modality]
+    space = default if space is None else space
+    unknown = set(space) - set(default)
+    if unknown:
+        raise ValueError(f"unknown hyperparameters in space for {modality}: {sorted(unknown)}")
     if _is_string_batch(x_inputs):
         inputs, candidate_kwargs = _embed_once(modality, x_inputs, model_kwargs, device)
     else:
@@ -246,12 +275,24 @@ def autotune(
     trials = []
     for i, params in enumerate(_candidates(space, search, n_candidates, seed)):
         candidate_seed = None if seed is None else seed + i
-        candidate = factory(
-            y_train, x_train, seed=candidate_seed, device=device, n_classes=n_classes, **train_kwargs, **params
-        )
+        try:  # guard the fit only (where OOM happens); a scoring error is a real bug and propagates
+            candidate = factory(
+                y_train, x_train, seed=candidate_seed, device=device, n_classes=n_classes, **train_kwargs, **params
+            )
+        except (RuntimeError, MemoryError) as exc:  # an OOM candidate must not kill the search; real bugs still raise
+            if not _is_oom(exc):
+                raise
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            trials.append({"params": params, "score": float("-inf"), "error": repr(exc)})
+            continue
+        # ponytail: an OOM during scoring (val predict) still propagates; fit is the expensive path
         score = _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)
         trials.append({"params": params, "score": score})
-    trials.sort(key=lambda trial: trial["score"], reverse=True)
+    if all(trial["score"] == float("-inf") for trial in trials):
+        raise RuntimeError("every autotune candidate failed; see trial['error'] in the result's .trials")
+    # best score first; ties break toward the cheaper fit (fewer epochs, then larger batch) for determinism
+    trials.sort(key=lambda trial: (-trial["score"], trial["params"].get("epochs", 0), -trial["params"].get("batch_size", 0)))
 
     best = trials[0]
     explainer = factory(y_outputs, x_inputs, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
