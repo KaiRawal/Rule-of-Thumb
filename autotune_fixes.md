@@ -83,3 +83,20 @@ Deferred (on purpose): the per-fit **plateau stopping inside the training loop**
 plateaus, with a max-epoch cap). That touches `RoT.training_loop`, which runs SWA averaging over its tail
 epochs, so an early stop there changes every fit's numerics and would disturb the committed weights and
 test floors (ToDo 22). It is P1, so it is left as a follow-up rather than risking the whole suite for it.
+
+## ToDo 30 — opt-in explanation evaluation
+
+New method `Explainer.evaluate(x, y, *, mask=None, reveal=False, rationales=None, seed=0)`, no refit:
+
+- **agreement** (always): surrogate-vs-label on the given data; below 0.75 it also warns (same tripwire as
+  `train_agreement_`).
+- **reveal gap** (`reveal=True`): `reveal_auc` minus a seeded random-order `reveal_auc_random`, via the
+  existing `get_order` / `score_ordering`; off by default so fits never run reveal machinery unasked.
+- **rationale AUROC** (when per-unit `rationales` are supplied): AUROC of the importance magnitudes against
+  the human mask, with a random-importance baseline. Dependency-free (Mann-Whitney with average ranks).
+
+Out of scope per the item: seed-stability refits, slice breakdowns, center priors, new dependencies, and any
+black-box insertion scoring (the package holds only the model's labels, never the model).
+
+Also fixed while here: a caller-pinned `epochs` (or any kwarg) no longer collides with the search; the per
+candidate call merges pinned kwargs and searched params into one dict (searched params win).

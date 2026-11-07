@@ -275,11 +275,11 @@ def autotune(
 
     def evaluate(params, seed_i, epochs=None):
         """Fit one candidate (optionally at a reduced epoch budget) and score it; OOM is skipped, not fatal."""
-        fit_params = params if epochs is None else {**params, "epochs": epochs}
+        call = {**train_kwargs, **params}  # searched params win over caller-pinned kwargs; screen epochs win over both
+        if epochs is not None:
+            call["epochs"] = epochs
         try:  # guard the fit only (where OOM happens); a scoring error is a real bug and propagates
-            candidate = factory(
-                y_train, x_train, seed=seed_i, device=device, n_classes=n_classes, **train_kwargs, **fit_params
-            )
+            candidate = factory(y_train, x_train, seed=seed_i, device=device, n_classes=n_classes, **call)
         except (RuntimeError, MemoryError) as exc:  # an OOM candidate must not kill the search; real bugs still raise
             if not _is_oom(exc):
                 raise

@@ -107,6 +107,38 @@ def _check_label_range(labels, n_classes):
     return labels
 
 
+def _shuffle_order(order, rng):
+    """A random reveal order: keep each row's padding (-1) in place, shuffle its valid unit indices."""
+    out = order.copy().reshape(len(order), -1)
+    for row in out:
+        idx = np.flatnonzero(row >= 0)
+        vals = row[idx]
+        rng.shuffle(vals)
+        row[idx] = vals
+    return out.reshape(order.shape)
+
+
+def _auroc(scores, labels):
+    """Mann-Whitney AUROC with average ranks (no sklearn); nan if one class is empty."""
+    scores, labels = np.asarray(scores, dtype=float), np.asarray(labels)
+    n_pos = int((labels == 1).sum())
+    n_neg = labels.size - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(scores, kind="mergesort")
+    ranks = np.empty(scores.size, dtype=float)
+    ranks[order] = np.arange(1, scores.size + 1)
+    sorted_scores, i = scores[order], 0
+    while i < scores.size:  # average ranks within tied runs
+        j = i
+        while j + 1 < scores.size and sorted_scores[j + 1] == sorted_scores[i]:
+            j += 1
+        if j > i:
+            ranks[order[i : j + 1]] = (i + j + 2) / 2
+        i = j + 1
+    return float((ranks[labels == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+
+
 class Explainer:
     """Fitted Rule-of-Thumb explainer.
 
@@ -268,6 +300,46 @@ class Explainer:
     def score_ordering(self, *args, **kwargs):
         """See :meth:`ruleofthumb.core.RoT.score_ordering`. Accepts raw strings / file paths."""
         return self._delegate("score_ordering", args, kwargs)
+
+    def evaluate(self, x, y, *, mask=None, reveal=False, rationales=None, seed=0):
+        """Report realised fit-quality measures for this explainer (opt-in, no refit).
+
+        Always returns ``agreement`` (surrogate-vs-label on the given data; below
+        0.75 it also warns). ``reveal=True`` adds ``reveal_auc`` / ``reveal_auc_random``
+        and their difference ``reveal_gap`` (reveal-curve AUC vs a seeded random order).
+        Passing per-unit ``rationales`` (a boolean array shaped like the reveal units:
+        ``(N, T)`` text, ``(N, H, W)`` image, ``(N, D)`` tabular) adds ``rationale_auroc``
+        of the importance magnitudes against them, with a random baseline
+        ``rationale_auroc_random``. Interventions on the black box are never run here.
+        """
+        mk = {"mask": mask} if mask is not None else {}
+        y = np.asarray(y).flatten()
+        preds = np.asarray(self.predict(x, **mk).cpu())
+        agreement = float((preds == y).mean())
+        if agreement < 0.75:
+            warnings.warn(f"low agreement ({agreement:.3f} < 0.75); explanations may be unreliable.", stacklevel=2)
+        out = {"agreement": agreement}
+
+        if reveal:
+            order = np.asarray(self.get_order(x, **mk))
+            yt = torch.from_numpy(y.astype(np.int64))
+            rot_auc = float(np.asarray(self.score_ordering(x, yt, order)).mean())
+            rand_auc = float(np.asarray(self.score_ordering(x, yt, _shuffle_order(order, np.random.RandomState(seed)))).mean())
+            out.update(reveal_auc=rot_auc, reveal_auc_random=rand_auc, reveal_gap=rot_auc - rand_auc)
+
+        if rationales is not None:
+            rationales = np.asarray(rationales)
+            unit = np.abs(self.get_explanation(x, **mk))  # (N, [classes], *unit_dims, [embedding])
+            while unit.ndim > rationales.ndim:            # reduce to the rationale (per-unit) shape
+                if rationales.ndim > 1 and unit.shape[1] == rationales.shape[1]:
+                    unit = unit.sum(axis=-1)              # axis 1 already a unit dim -> extra axis is trailing
+                else:
+                    unit = unit.sum(axis=1)               # axis 1 is the class axis
+            keep = np.asarray(mask).astype(bool) if mask is not None else np.ones(rationales.shape, dtype=bool)
+            labels = rationales[keep].ravel().astype(int)
+            out["rationale_auroc"] = _auroc(unit[keep].ravel(), labels)
+            out["rationale_auroc_random"] = _auroc(np.random.RandomState(seed).rand(labels.size), labels)
+        return out
 
     def save(self, path):
         """Persist this explainer to ``path`` for reloading without refitting.

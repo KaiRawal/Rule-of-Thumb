@@ -389,3 +389,35 @@ def test_fits_run_no_reveal_machinery(tabular_data, monkeypatch):
     x, y = tabular_data
     exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
     assert exp.train_agreement_ >= 0.75
+
+
+def test_evaluate_reports_agreement_reveal_and_rationale():
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(0)
+    x = rng.randn(200, 4).astype(np.float32)
+    y = (x[:, 0] > 0).astype(np.int64)                 # only feature 0 matters
+    exp = fit_tabular(y, x, tune=None, epochs=300, learning_rate=0.05, seed=0, n_classes=2)
+
+    base = exp.evaluate(x, y)
+    assert set(base) == {"agreement"} and base["agreement"] > 0.9
+
+    rev = exp.evaluate(x, y, reveal=True, seed=0)
+    assert rev["reveal_gap"] == rev["reveal_auc"] - rev["reveal_auc_random"]
+    assert np.isfinite(rev["reveal_gap"])
+
+    rationales = np.zeros((200, 4), dtype=bool)
+    rationales[:, 0] = True                            # the real signal is feature 0
+    rat = exp.evaluate(x, y, rationales=rationales, seed=0)
+    assert rat["rationale_auroc"] > rat["rationale_auroc_random"]   # importance beats random at finding feature 0
+
+
+def test_evaluate_warns_on_low_agreement():
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(0)
+    x = rng.randn(120, 4).astype(np.float32)
+    y = rng.randint(0, 2, size=120).astype(np.int64)   # label is noise -> low agreement
+    exp = fit_tabular(y, x, tune=None, epochs=50, learning_rate=0.05, seed=0, n_classes=2)
+    with pytest.warns(UserWarning, match="low agreement"):
+        exp.evaluate(x, y)
