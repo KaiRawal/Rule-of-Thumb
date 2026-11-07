@@ -32,7 +32,7 @@ def _png_bytes(fig):
 
 def test_tabular_plots_render_and_export(tabular_binary):
     x = tabular_binary["x"]
-    explainer = fit_tabular(tabular_binary["y"], x, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    explainer = fit_tabular(tabular_binary["y"], x, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
     names = [f"feature_{i}" for i in range(x.shape[1])]
 
     for name in ("waterfall", "force", "decision"):
@@ -47,7 +47,7 @@ def test_text_html_highlights_real_tokens(text_sst2):
     texts = text_sst2["texts"]
     embedded = embed_texts(texts, device=TEST_DEVICE)
     mask = embedded.attention_mask
-    explainer = fit_text(text_sst2["y"], embedded.embeddings, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    explainer = fit_text(text_sst2["y"], embedded.embeddings, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
     imp = explainer.get_explanation(embedded.embeddings, mask=mask)[0]
     tokens = embedded.tokens[0]
@@ -72,7 +72,7 @@ def test_word_clouds_render_review_tokens(text_sst2):
     texts = text_sst2["texts"]
     embedded = embed_texts(texts, device=TEST_DEVICE)
     mask = embedded.attention_mask
-    explainer = fit_text(text_sst2["y"], embedded.embeddings, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    explainer = fit_text(text_sst2["y"], embedded.embeddings, mask=mask, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
     rows, token_lists = [], []
     for i in range(len(texts)):
@@ -87,7 +87,7 @@ def test_word_clouds_render_review_tokens(text_sst2):
 def test_multiclass_tabular_plots_per_class(tabular_multiclass):
     """Multiclass SHAP plots select the right class slice; baselines differ per class."""
     x, y = tabular_multiclass["x"], tabular_multiclass["y"]
-    explainer = fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE, n_classes=10)
+    explainer = fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE, n_classes=10)
     names = [f"pixel_{i}" for i in range(x.shape[1])]
 
     # the SHAP baseline maps to the per-class bias g_k: classes must disagree
@@ -107,11 +107,11 @@ def test_image_saliency_from_fitted_explainer(image_multiclass):
     x = image_multiclass["x"]
     backdrop = x[0, 0]  # first channel as a greyscale backdrop
 
-    binary = fit_image(image_multiclass["y_binary"], x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE, n_classes=2)
+    binary = fit_image(image_multiclass["y_binary"], x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE, n_classes=2)
     imp_binary = binary.get_explanation(x)  # (N, H, W): channels already summed
     assert len(_png_bytes(plot.saliency(imp_binary[0], image=backdrop))) > 1000
 
-    multi = fit_image(image_multiclass["y"], x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE, n_classes=10)
+    multi = fit_image(image_multiclass["y"], x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE, n_classes=10)
     imp_multi = multi.get_explanation(x)  # (N, K, H, W)
     assert len(_png_bytes(plot.saliency(imp_multi[0, 3], image=backdrop))) > 1000
 
@@ -119,7 +119,7 @@ def test_image_saliency_from_fitted_explainer(image_multiclass):
 def test_text_native_string_pipeline_and_matplotlib_export(text_sst2):
     """Raw strings flow end-to-end into HTML and matplotlib token plots."""
     texts, y = text_sst2["texts"], text_sst2["y"]
-    explainer = fit_text(y, texts, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    explainer = fit_text(y, texts, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
     embedded = embed_texts([texts[0]], device=TEST_DEVICE)
     tokens = [t for t, real in zip(embedded.tokens[0], embedded.attention_mask[0]) if real]

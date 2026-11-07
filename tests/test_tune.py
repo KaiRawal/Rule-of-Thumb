@@ -279,3 +279,30 @@ def test_successive_halving_prunes_but_keeps_the_winner():
     assert any(t.get("pruned") for t in result.trials)      # the cheap screen abandoned the weak half
     assert result.best_score > 0.9                           # a good learning rate still won
     assert result.best_params["learning_rate"] in (0.03, 0.05)
+
+
+def test_tune_flag_attaches_params_only_when_tuning():
+    x, y = _separable_dataset()
+    tuned = fit_tabular(y, x, tune=True, n_classes=2)
+    assert tuned.best_params_ is not None and tuned.best_score_ is not None
+    fixed = fit_tabular(y, x, tune=None, n_classes=2)
+    assert not hasattr(fixed, "best_params_")  # the escape hatch attaches nothing
+
+
+def test_tune_none_and_false_give_the_same_fixed_fit():
+    x, y = _separable_dataset()
+    a = fit_tabular(y, x, tune=None, epochs=50, learning_rate=0.05, seed=0, n_classes=2)
+    b = fit_tabular(y, x, tune=False, epochs=50, learning_rate=0.05, seed=0, n_classes=2)
+    assert np.allclose(a.get_explanation(x), b.get_explanation(x))
+
+
+def test_bad_tune_value_raises():
+    x, y = _separable_dataset()
+    with pytest.raises(TypeError, match="tune must be"):
+        fit_tabular(y, x, tune="yes", n_classes=2)
+
+
+def test_recursion_guard_uses_undecorated_factories():
+    from ruleofthumb import tune
+
+    assert tune._FACTORIES["tabular"] is fit_tabular.__wrapped__  # candidates fit with tuning off
