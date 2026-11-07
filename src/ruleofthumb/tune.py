@@ -6,7 +6,8 @@ Keras-tuner-style search over the exposed training hyperparameters
 scored on held-out data (by plain agreement unless ``scoring="reveal"`` is
 named), and the winner is refit on all data. The default search space is
 per-modality (:data:`DEFAULT_SPACES`) so each one reaches its own working
-regime. A candidate that errors out (e.g. OOM) is recorded and skipped, not
+regime. With four or more candidates the search screens them cheaply and finishes only
+the better half (successive halving). A candidate that errors out (e.g. OOM) is recorded and skipped, not
 fatal. Dropout is a fixed method constant (0.5) and is never searched.
 """
 
@@ -272,23 +273,35 @@ def autotune(
     train_kwargs = _split_kwargs(candidate_kwargs, train_idx, len(inputs))
     val_mask = _split_value(candidate_kwargs.get("mask"), val_idx, len(inputs))
 
-    trials = []
-    for i, params in enumerate(_candidates(space, search, n_candidates, seed)):
-        candidate_seed = None if seed is None else seed + i
+    def evaluate(params, seed_i, epochs=None):
+        """Fit one candidate (optionally at a reduced epoch budget) and score it; OOM is skipped, not fatal."""
+        fit_params = params if epochs is None else {**params, "epochs": epochs}
         try:  # guard the fit only (where OOM happens); a scoring error is a real bug and propagates
             candidate = factory(
-                y_train, x_train, seed=candidate_seed, device=device, n_classes=n_classes, **train_kwargs, **params
+                y_train, x_train, seed=seed_i, device=device, n_classes=n_classes, **train_kwargs, **fit_params
             )
         except (RuntimeError, MemoryError) as exc:  # an OOM candidate must not kill the search; real bugs still raise
             if not _is_oom(exc):
                 raise
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            trials.append({"params": params, "score": float("-inf"), "error": repr(exc)})
-            continue
+            return {"params": params, "score": float("-inf"), "error": repr(exc)}
         # ponytail: an OOM during scoring (val predict) still propagates; fit is the expensive path
-        score = _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)
-        trials.append({"params": params, "score": score})
+        return {"params": params, "score": _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)}
+
+    candidates = _candidates(space, search, n_candidates, seed)
+    seeds = [None if seed is None else seed + i for i in range(len(candidates))]
+    if len(candidates) >= 4:
+        # Successive halving (ToDo 29): screen every candidate at ~1/3 of its epochs, then finish only the
+        # better-scoring half at full epochs. Abandoned candidates keep their cheap screen score.
+        # ponytail: fixed 1/3 rung and top-half keep; a multi-rung schedule only pays off past ~tens of candidates.
+        screen = [evaluate(p, s, epochs=max(1, p.get("epochs", 300) // 3)) for p, s in zip(candidates, seeds)]
+        ranked = sorted(range(len(candidates)), key=lambda j: screen[j]["score"], reverse=True)
+        survivors = set(ranked[: (len(candidates) + 1) // 2])
+        trials = [evaluate(candidates[j], seeds[j]) if j in survivors else {**screen[j], "pruned": True}
+                  for j in range(len(candidates))]
+    else:
+        trials = [evaluate(p, s) for p, s in zip(candidates, seeds)]
     if all(trial["score"] == float("-inf") for trial in trials):
         raise RuntimeError("every autotune candidate failed; see trial['error'] in the result's .trials")
     # best score first; ties break toward the cheaper fit (fewer epochs, then larger batch) for determinism

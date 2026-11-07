@@ -269,3 +269,13 @@ def test_all_candidates_oom_raises(monkeypatch):
     with pytest.raises(RuntimeError, match="every autotune candidate failed"):
         autotune(y, x, modality="tabular", search="grid",
                  space={"learning_rate": [0.05], "epochs": [100], "batch_size": [64]}, seed=0)
+
+
+def test_successive_halving_prunes_but_keeps_the_winner():
+    x, y = _separable_dataset()
+    space = {"learning_rate": [1e-5, 1e-4, 0.03, 0.05], "epochs": [60], "batch_size": [64]}  # >=4 -> halving on
+    result = autotune(y, x, modality="tabular", search="grid", space=space, seed=0)
+
+    assert any(t.get("pruned") for t in result.trials)      # the cheap screen abandoned the weak half
+    assert result.best_score > 0.9                           # a good learning rate still won
+    assert result.best_params["learning_rate"] in (0.03, 0.05)

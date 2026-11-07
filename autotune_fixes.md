@@ -70,3 +70,16 @@ change, from newer library versions in the test environment.)
 Autotune can now reach the paper-reproducing hyperparameters without hand-setting
 them. That is the autotune half of recovering Movie and Judicial for ToDo 36; the
 text-memory fix and the `b` decision are what remain for those.
+
+## ToDo 29 — fit-to-convergence / early abandonment
+
+Done: **successive halving** in `autotune`. With four or more candidates the search screens every
+candidate at ~1/3 of its epochs, ranks them, and finishes only the better-scoring half at full epochs;
+abandoned candidates keep their cheap screen score (marked `pruned`). This is the "give up on hopeless
+hyperparameter combinations early" half of ToDo 29 and the main affordability win, and it lives entirely
+in `tune.py`.
+
+Deferred (on purpose): the per-fit **plateau stopping inside the training loop** (stop when agreement
+plateaus, with a max-epoch cap). That touches `RoT.training_loop`, which runs SWA averaging over its tail
+epochs, so an early stop there changes every fit's numerics and would disturb the committed weights and
+test floors (ToDo 22). It is P1, so it is left as a follow-up rather than risking the whole suite for it.
