@@ -14,7 +14,6 @@ binary tasks, full per-class output for ``n_classes > 2``.
 from __future__ import annotations
 
 import functools
-import inspect
 import os
 import warnings
 from typing import Any
@@ -105,6 +104,38 @@ def _check_label_range(labels, n_classes):
             "or remap the labels (e.g. binary-vs-rest) before fitting"
         )
     return labels
+
+
+def _shuffle_order(order, rng):
+    """A random reveal order: keep each row's padding (-1) in place, shuffle its valid unit indices."""
+    out = order.copy().reshape(len(order), -1)
+    for row in out:
+        idx = np.flatnonzero(row >= 0)
+        vals = row[idx]
+        rng.shuffle(vals)
+        row[idx] = vals
+    return out.reshape(order.shape)
+
+
+def _auroc(scores, labels):
+    """Mann-Whitney AUROC with average ranks (no sklearn); nan if one class is empty."""
+    scores, labels = np.asarray(scores, dtype=float), np.asarray(labels)
+    n_pos = int((labels == 1).sum())
+    n_neg = labels.size - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(scores, kind="mergesort")
+    ranks = np.empty(scores.size, dtype=float)
+    ranks[order] = np.arange(1, scores.size + 1)
+    sorted_scores, i = scores[order], 0
+    while i < scores.size:  # average ranks within tied runs
+        j = i
+        while j + 1 < scores.size and sorted_scores[j + 1] == sorted_scores[i]:
+            j += 1
+        if j > i:
+            ranks[order[i : j + 1]] = (i + j + 2) / 2
+        i = j + 1
+    return float((ranks[labels == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
 
 
 class Explainer:
@@ -269,6 +300,46 @@ class Explainer:
         """See :meth:`ruleofthumb.core.RoT.score_ordering`. Accepts raw strings / file paths."""
         return self._delegate("score_ordering", args, kwargs)
 
+    def evaluate(self, x, y, *, mask=None, reveal=False, rationales=None, seed=0):
+        """Report realised fit-quality measures for this explainer (opt-in, no refit).
+
+        Always returns ``agreement`` (surrogate-vs-label on the given data; below
+        0.75 it also warns). ``reveal=True`` adds ``reveal_auc`` / ``reveal_auc_random``
+        and their difference ``reveal_gap`` (reveal-curve AUC vs a seeded random order).
+        Passing per-unit ``rationales`` (a boolean array shaped like the reveal units:
+        ``(N, T)`` text, ``(N, H, W)`` image, ``(N, D)`` tabular) adds ``rationale_auroc``
+        of the importance magnitudes against them, with a random baseline
+        ``rationale_auroc_random``. Interventions on the black box are never run here.
+        """
+        mk = {"mask": mask} if mask is not None else {}
+        y = np.asarray(y).flatten()
+        preds = np.asarray(self.predict(x, **mk).cpu())
+        agreement = float((preds == y).mean())
+        if agreement < 0.75:
+            warnings.warn(f"low agreement ({agreement:.3f} < 0.75); explanations may be unreliable.", stacklevel=2)
+        out = {"agreement": agreement}
+
+        if reveal:
+            order = np.asarray(self.get_order(x, **mk))
+            yt = torch.from_numpy(y.astype(np.int64))
+            rot_auc = float(np.asarray(self.score_ordering(x, yt, order)).mean())
+            rand_auc = float(np.asarray(self.score_ordering(x, yt, _shuffle_order(order, np.random.RandomState(seed)))).mean())
+            out.update(reveal_auc=rot_auc, reveal_auc_random=rand_auc, reveal_gap=rot_auc - rand_auc)
+
+        if rationales is not None:
+            rationales = np.asarray(rationales)
+            unit = np.abs(self.get_explanation(x, **mk))  # (N, [classes], *unit_dims, [embedding])
+            while unit.ndim > rationales.ndim:            # reduce to the rationale (per-unit) shape
+                if rationales.ndim > 1 and unit.shape[1] == rationales.shape[1]:
+                    unit = unit.sum(axis=-1)              # axis 1 already a unit dim -> extra axis is trailing
+                else:
+                    unit = unit.sum(axis=1)               # axis 1 is the class axis
+            keep = np.asarray(mask).astype(bool) if mask is not None else np.ones(rationales.shape, dtype=bool)
+            labels = rationales[keep].ravel().astype(int)
+            out["rationale_auroc"] = _auroc(unit[keep].ravel(), labels)
+            out["rationale_auroc_random"] = _auroc(np.random.RandomState(seed).rand(labels.size), labels)
+        return out
+
     def save(self, path):
         """Persist this explainer to ``path`` for reloading without refitting.
 
@@ -364,47 +435,31 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
 _TUNE_OPTIONS = frozenset({"space", "n_candidates", "scoring", "search", "validation_split"})
 
 
-def _tunable(modality):
-    """Give a factory ``tune=True`` (the default): search its hyperparameters via :func:`ruleofthumb.autotune`.
+def _dispatch_tune(modality, tune, y_outputs, x_inputs, passthrough):
+    """Search this modality's hyperparameters via :func:`ruleofthumb.autotune` and return the tuned explainer.
 
-    ``tune=True`` runs ``autotune`` with its defaults; a dict overrides
-    ``space`` / ``n_candidates`` / ``scoring`` / ``search`` /
-    ``validation_split``; ``None`` / ``False`` runs the fixed fit.
-    Hyperparameters passed explicitly are pinned: they leave the search
-    space, and when nothing is left to search the fixed fit runs. A tuned
-    fit carries ``best_params_`` / ``best_score_`` (held-out score of the
-    winner). ``autotune`` calls the undecorated factory (``__wrapped__``),
-    which is the recursion guard.
+    Called by the factories when ``tune`` is ``True`` or a dict (``None`` /
+    ``False`` run the fixed fit instead). A dict overrides ``space`` /
+    ``n_candidates`` / ``scoring`` / ``search`` / ``validation_split``. The
+    non-searched arguments (``seed``, ``n_classes``, ``device``, ``mask``,
+    backbone/tokenizer, ...) ride along in ``passthrough``; the searched
+    hyperparameters come from the space, so values passed for them are not
+    pinned (use ``tune=None`` or a one-value ``space`` to fix one). ``autotune``
+    refits candidates through the same factory with ``tune=None`` — the
+    recursion guard. The result carries ``best_params_`` / ``best_score_``.
     """
+    if tune is not True and not isinstance(tune, dict):
+        raise TypeError(f"tune must be True, False, None or a dict of autotune options, got {tune!r}")
+    options = {} if tune is True else dict(tune)
+    unknown = set(options) - _TUNE_OPTIONS
+    if unknown:
+        raise ValueError(f"unknown tune options: {sorted(unknown)}; expected a subset of {sorted(_TUNE_OPTIONS)}")
+    from ruleofthumb.tune import autotune
 
-    def decorate(factory):
-        @functools.wraps(factory)
-        def wrapper(y_outputs, x_inputs, *, tune=True, **kwargs):
-            if tune is None or tune is False:
-                return factory(y_outputs, x_inputs, **kwargs)
-            if tune is not True and not isinstance(tune, dict):
-                raise TypeError(f"tune must be True, False, None or a dict of autotune options, got {tune!r}")
-            options = {} if tune is True else dict(tune)
-            unknown = set(options) - _TUNE_OPTIONS
-            if unknown:
-                raise ValueError(f"unknown tune options: {sorted(unknown)}; expected a subset of {sorted(_TUNE_OPTIONS)}")
-            from ruleofthumb.tune import DEFAULT_SPACE, autotune
-
-            space = {key: values for key, values in options.pop("space", DEFAULT_SPACE).items() if key not in kwargs}
-            if not space:
-                return factory(y_outputs, x_inputs, **kwargs)
-            kwargs.setdefault("n_classes", 2)  # the factories' default, not autotune's inference
-            result = autotune(y_outputs, x_inputs, modality=modality, space=space, **options, **kwargs)
-            explainer = result.explainer
-            explainer.best_params_, explainer.best_score_ = result.best_params, result.best_score
-            return explainer
-
-        signature = inspect.signature(factory)
-        tune_param = inspect.Parameter("tune", inspect.Parameter.KEYWORD_ONLY, default=True)
-        wrapper.__signature__ = signature.replace(parameters=[*signature.parameters.values(), tune_param])
-        return wrapper
-
-    return decorate
+    result = autotune(y_outputs, x_inputs, modality=modality, **options, **passthrough)
+    explainer = result.explainer
+    explainer.best_params_, explainer.best_score_ = result.best_params, result.best_score
+    return explainer
 
 
 def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
@@ -435,7 +490,6 @@ def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
     return factories[modality](y_outputs, x_inputs, **kwargs)
 
 
-@_tunable("tabular")
 def fit_tabular(
     y_outputs,
     x_inputs,
@@ -449,8 +503,18 @@ def fit_tabular(
     n_classes=2,
     device=None,
     nonlinear=None,
+    tune=True,
 ):
-    """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs."""
+    """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs.
+
+    ``tune=True`` (the default) searches the hyperparameters via
+    :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit
+    with the arguments as given; a dict overrides the autotune options.
+    """
+    if tune is not None and tune is not False:
+        return _dispatch_tune("tabular", tune, y_outputs, x_inputs,
+                              {"seed": seed, "n_classes": n_classes, "device": device,
+                               "nonlinear": nonlinear, "pretrain_epochs": pretrain_epochs})
     labels = _check_label_range(_as_labels(y_outputs), n_classes)
     model = RoT(n_classes, (x_inputs.shape[1],), device=device, nonlinear=nonlinear)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
@@ -467,7 +531,6 @@ def fit_tabular(
     return _attach_fit_quality(Explainer(model, "tabular"), _as_float_inputs(x_inputs), labels)
 
 
-@_tunable("text")
 def fit_text(
     y_outputs,
     x_inputs,
@@ -485,6 +548,7 @@ def fit_text(
     n_classes=2,
     device=None,
     nonlinear=None,
+    tune=True,
 ):
     """Fit a text :class:`Explainer` on ``(N, tokens, embedding)`` inputs or raw strings.
 
@@ -502,7 +566,14 @@ def fit_text(
 
     Explainers fitted from strings accept the same strings back in every
     public method; each call re-embeds the texts.
+
+    ``tune=True`` (the default) searches the hyperparameters via
+    :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
     """
+    if tune is not None and tune is not False:
+        return _dispatch_tune("text", tune, y_outputs, x_inputs,
+                              {"seed": seed, "n_classes": n_classes, "device": device, "nonlinear": nonlinear,
+                               "pretrain_epochs": pretrain_epochs, "mask": mask, "tokenizer": tokenizer, "model": model})
     string_embedder = None
     if _is_string_batch(x_inputs):
         if mask is not None:
@@ -549,7 +620,6 @@ def _path_loader(backbone, size, transform):
     return functools.partial(embed_images, backbone=backbone, size=size), backbone if isinstance(backbone, str) else None
 
 
-@_tunable("image")
 def fit_image(
     y_outputs,
     x_inputs,
@@ -567,6 +637,7 @@ def fit_image(
     n_classes=2,
     device=None,
     nonlinear=None,
+    tune=True,
 ):
     """Fit an image :class:`Explainer` on ``(N, C, H, W)`` inputs or image file paths.
 
@@ -592,7 +663,15 @@ def fit_image(
     method; each call re-loads (and re-embeds) the files. A reloaded
     explainer consumes numeric arrays; the backbone id is recorded in
     ``explainer.backbone`` and the save file for provenance.
+
+    ``tune=True`` (the default) searches the hyperparameters via
+    :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
     """
+    if tune is not None and tune is not False:
+        return _dispatch_tune("image", tune, y_outputs, x_inputs,
+                              {"seed": seed, "n_classes": n_classes, "device": device, "nonlinear": nonlinear,
+                               "pretrain_epochs": pretrain_epochs, "mask": mask, "backbone": backbone,
+                               "size": size, "transform": transform})
     image_loader = None
     backbone_id = None
     if _is_string_batch(x_inputs):
