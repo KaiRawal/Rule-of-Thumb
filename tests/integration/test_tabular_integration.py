@@ -17,7 +17,7 @@ SEED = 0
 
 
 def _fit_binary(x, y):
-    return fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    return fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
 
 def test_binary_explanation_shape_additivity_and_fidelity(tabular_binary):
@@ -83,7 +83,7 @@ def test_binary_seed_reproducibility(tabular_binary):
 
 def test_multiclass_explanation_shape_and_fidelity(tabular_multiclass):
     x, y = tabular_multiclass["x"], tabular_multiclass["y"]
-    exp = fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE, n_classes=10)
+    exp = fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE, n_classes=10)
     imp = exp.get_explanation(x)
     assert imp.shape == (len(x), 10, x.shape[1])
     for k in range(10):
@@ -96,7 +96,7 @@ def test_multiclass_explanation_shape_and_fidelity(tabular_multiclass):
 
 def test_multiclass_confusion_counts_match_active_samples(tabular_multiclass):
     x, y = tabular_multiclass["x"], tabular_multiclass["y"]
-    exp = fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE, n_classes=10)
+    exp = fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE, n_classes=10)
     xt = torch.from_numpy(x)
     yt = torch.from_numpy(y.astype(np.int64))
     order = exp.get_order(xt)

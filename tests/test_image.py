@@ -105,7 +105,7 @@ def test_facade_binary_pipeline_with_untrained_conv_black_box():
     with torch.no_grad():
         y = black_box(x).argmax(1)
 
-    exp = fit_image(y.numpy(), x.numpy(), epochs=4, batch_size=8, learning_rate=0.05, device="cpu")
+    exp = fit_image(y.numpy(), x.numpy(), epochs=4, batch_size=8, learning_rate=0.05, device="cpu", tune=None)
     assert exp.modality == "image"
     assert exp.model.classes == 2
     assert exp.model.a.device.type == "cpu"  # device passthrough
@@ -139,7 +139,7 @@ def test_facade_binary_padded_batch_respects_mask():
         labels = black_box(padded_probe).argmax(1)
 
     padded, mask = _pad_images([small[0], big[0]])
-    exp = fit_image(labels.numpy(), padded.numpy(), mask=mask.numpy(), epochs=4, batch_size=2, learning_rate=0.05)
+    exp = fit_image(labels.numpy(), padded.numpy(), mask=mask.numpy(), epochs=4, batch_size=2, learning_rate=0.05, tune=None)
     imp = exp.get_explanation(padded.numpy(), mask=mask.numpy())
     assert imp.shape == (2, 6, 5)
     assert (imp[0, 4:, :] == 0).all()  # sample 0's bottom rows are padding
@@ -213,7 +213,7 @@ def test_fit_routes_image_paths_to_image(png_paths):
     from ruleofthumb import fit
 
     y = np.array([0, 1])
-    exp = fit(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05, tune=None)
     assert exp.modality == "image"
     assert exp.get_explanation(png_paths).shape == (2, 2, 2)
 
@@ -222,7 +222,7 @@ def test_facade_methods_accept_paths(png_paths):
     from ruleofthumb import fit_image
 
     y = np.array([0, 1])
-    exp = fit_image(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit_image(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05, tune=None)
 
     imp = exp.get_explanation(png_paths)
     assert imp.shape == (2, 2, 2)
@@ -240,7 +240,7 @@ def test_numpy_path_arrays_route_to_image(png_paths):
 
     y = np.array([0, 1])
     arr = np.array(png_paths)
-    exp = fit_image(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit_image(y, png_paths, backbone=None, size=(2, 2), epochs=2, batch_size=2, learning_rate=0.05, tune=None)
 
     assert np.allclose(exp.get_explanation(arr), exp.get_explanation(png_paths))
     assert np.array_equal(
@@ -288,13 +288,13 @@ def test_paths_with_explicit_mask_rejected(png_paths):
     from ruleofthumb import fit_image
 
     with pytest.raises(ValueError, match="automatically"):
-        fit_image(np.array([0, 1]), png_paths, mask=np.ones((2, 2, 2), dtype=bool))
+        fit_image(np.array([0, 1]), png_paths, mask=np.ones((2, 2, 2), dtype=bool), tune=None)
 
 
 def test_get_explanation_paths_on_array_fitted_raises(image_data):
     from ruleofthumb import fit_image
 
     x, y = image_data
-    exp = fit_image(y.numpy(), x, epochs=2, batch_size=8, learning_rate=0.05)
+    exp = fit_image(y.numpy(), x, epochs=2, batch_size=8, learning_rate=0.05, tune=None)
     with pytest.raises(ValueError, match="fitted on image arrays"):
         exp.get_explanation(["a.png", "b.png"])

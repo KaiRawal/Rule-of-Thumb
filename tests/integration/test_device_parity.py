@@ -38,7 +38,7 @@ def _synthetic(n=256, d=4):
 
 
 def _fit(x, y, device):
-    return fit_tabular(y, x, epochs=50, batch_size=64, learning_rate=0.05, seed=SEED, device=device)
+    return fit_tabular(y, x, epochs=50, batch_size=64, learning_rate=0.05, tune=None, seed=SEED, device=device)
 
 
 def test_cpu_fit_reproduces_exactly():

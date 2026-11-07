@@ -28,7 +28,7 @@ ACCURACY_FLOORS = {
 
 def _fit(stem, x, y):
     n_classes = 3 if stem == "wine" else 2
-    return fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=0, device=TEST_DEVICE, n_classes=n_classes)
+    return fit_tabular(y, x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=0, device=TEST_DEVICE, n_classes=n_classes)
 
 
 @pytest.mark.parametrize("stem", ["compas", "wine"])
@@ -112,10 +112,10 @@ def test_breast_cancer_fidelity_and_rank_agreement():
     ybb_tr = bb.predict(xtr).astype(np.int64)
     ybb_te = bb.predict(xte).astype(np.int64)
 
-    exp = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, device=TEST_DEVICE)
+    exp = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, tune=None, seed=0, device=TEST_DEVICE)
     assert rot_accuracy(exp, xte, ybb_te) >= 0.9  # ensemble min 0.979
 
-    shaped = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, seed=0, device=TEST_DEVICE, nonlinear="rbf")
+    shaped = fit_tabular(ybb_tr, xtr, epochs=100, batch_size=500, learning_rate=0.05, tune=None, seed=0, device=TEST_DEVICE, nonlinear="rbf")
     assert rot_accuracy(shaped, xte, ybb_te) >= 0.9  # ensemble min 0.951
 
     rot_scores = np.abs(exp.get_explanation(xte)).mean(0)

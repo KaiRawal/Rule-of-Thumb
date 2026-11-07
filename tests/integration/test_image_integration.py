@@ -30,7 +30,7 @@ SEED = 0
 
 
 def _fit_image(x, y, n_classes):
-    return fit_image(y, x, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, n_classes=n_classes, device=TEST_DEVICE)
+    return fit_image(y, x, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, n_classes=n_classes, device=TEST_DEVICE)
 
 
 def _pet_paths_and_labels(pets):
@@ -56,7 +56,7 @@ def test_native_image_ingestion_end_to_end(pets):
     green_mass = loaded.images[:, 1].sum(axis=(1, 2))
     y = (green_mass > np.median(green_mass)).astype(np.int64)
 
-    exp = fit_image(y, paths, backbone=None, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    exp = fit_image(y, paths, backbone=None, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
     assert exp.modality == "image"
     imp = exp.get_explanation(paths)
@@ -75,8 +75,8 @@ def test_native_path_equals_array_path(pets):
     paths, y = _pet_paths_and_labels(pets)
     loaded = load_images(paths, size=(64, 64))
 
-    native = fit_image(y, paths, backbone=None, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
-    arrays = fit_image(y, loaded.images, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    native = fit_image(y, paths, backbone=None, size=(64, 64), epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
+    arrays = fit_image(y, loaded.images, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
     imp_native = native.get_explanation(paths)
     imp_arrays = arrays.get_explanation(loaded.images)
@@ -323,7 +323,7 @@ def test_default_backbone_path_end_to_end(pets, tmp_path):
     assert embedded.mask.dtype == bool
     assert embedded.mask.all()  # uniform size: every map cell is real
 
-    exp = fit_image(y, paths, size=(64, 64), epochs=10, batch_size=8, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    exp = fit_image(y, paths, size=(64, 64), epochs=10, batch_size=8, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
     assert exp.backbone == DEFAULT_IMAGE_MODEL
     imp = exp.get_explanation(paths)
     assert imp.shape == (6,) + embedded.maps.shape[2:]

@@ -64,7 +64,7 @@ def test_explainer_explanation_shape(tabular_data):
     from ruleofthumb import fit_tabular
 
     x, y = tabular_data
-    exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05)
+    exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, tune=None)
     assert exp.get_explanation(x).shape == (64, 5)
 
 
@@ -72,7 +72,7 @@ def test_explainer_signed_explanations(tabular_data):
     from ruleofthumb import fit_tabular
 
     x, y = tabular_data
-    exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
+    exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0, tune=None)
     imp = exp.get_explanation(x)
 
     # signed: both positive and negative contributions exist
@@ -90,7 +90,7 @@ def test_explainer_multiclass_per_class_output(tabular_data):
 
     x, _ = tabular_data
     y3 = (x[:, 0] > 0).astype(np.int64) + (x[:, 1] > 0).astype(np.int64)  # labels in {0, 1, 2}
-    exp = fit_tabular(y3, x, epochs=4, batch_size=32, learning_rate=0.05, n_classes=3)
+    exp = fit_tabular(y3, x, epochs=4, batch_size=32, learning_rate=0.05, n_classes=3, tune=None)
     imp = exp.get_explanation(x)
     assert imp.shape == (64, 3, 5)
     for k in range(3):
@@ -102,7 +102,7 @@ def test_text_explanation_shape(text_data):
 
     x, lengths, y = text_data
     mask = lengths_to_mask(lengths, x.shape[1]).numpy()
-    exp = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask)
+    exp = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, tune=None)
     imp = exp.get_explanation(x, mask=mask)
     assert imp.shape == (32, 6)
 
@@ -116,9 +116,9 @@ def test_text_mask_from_lengths_matches_manual(text_data):
     manual = (torch.arange(6)[None, :] < lengths[:, None]).numpy()
     assert (mask == manual).all()
     torch.manual_seed(0)
-    by_bridge = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, mask=mask)
+    by_bridge = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, mask=mask, tune=None)
     torch.manual_seed(0)
-    by_manual = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, mask=manual)
+    by_manual = fit_text(y, x, epochs=2, batch_size=16, learning_rate=0.01, mask=manual, tune=None)
     assert np.allclose(
         by_bridge.get_explanation(x, mask=mask), by_manual.get_explanation(x, mask=manual)
     )
@@ -130,7 +130,7 @@ def test_text_multiclass_per_class_output(text_data):
     x, lengths, _ = text_data
     y3 = (x[:, 0, 0] > 0).astype(np.int64) + (x[:, 1, 1] > 0).astype(np.int64)  # labels in {0, 1, 2}
     mask = lengths_to_mask(lengths, x.shape[1]).numpy()
-    exp = fit_text(y3, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, n_classes=3)
+    exp = fit_text(y3, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, n_classes=3, tune=None)
     assert exp.model.classes == 3
     imp = exp.get_explanation(x, mask=mask)
     # K > 2: full per-class output, class axis not collapsed
@@ -144,7 +144,7 @@ def test_image_explanation_shape_and_padding(image_data):
     from ruleofthumb import fit_image
 
     x, mask, y = image_data
-    exp = fit_image(y, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.05)
+    exp = fit_image(y, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.05, tune=None)
     imp = exp.get_explanation(x, mask=mask.numpy())
     assert exp.modality == "image"
     assert imp.shape == (16, 6, 6)
@@ -158,7 +158,7 @@ def test_image_multiclass_per_class_output(image_data):
 
     x, mask, _ = image_data
     y3 = (x[:, 0, 0, 0] > 0).astype(np.int64) + (x[:, 0, 1, 1] > 0).astype(np.int64)  # {0, 1, 2}
-    exp = fit_image(y3, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.05, n_classes=3)
+    exp = fit_image(y3, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.05, n_classes=3, tune=None)
     imp = exp.get_explanation(x, mask=mask.numpy())
     assert imp.shape == (16, 3, 6, 6)
     for k in range(3):
@@ -174,18 +174,18 @@ def test_modality_specific_padding_arguments_rejected(tabular_data, text_data, i
     ix, _imask, iy = image_data
     tmask = lengths_to_mask(lengths, tx.shape[1]).numpy()
 
-    tab = fit_tabular(y, x, epochs=2, batch_size=32)
+    tab = fit_tabular(y, x, epochs=2, batch_size=32, tune=None)
     with pytest.raises(ValueError, match="no mask"):
         tab.get_explanation(x, mask=np.ones((64, 5), dtype=bool))
 
     # text speaks mask= only: the retired lengths=/attention_mask= spellings are TypeErrors
-    txt = fit_text(ty, tx, epochs=2, batch_size=16, mask=tmask)
+    txt = fit_text(ty, tx, epochs=2, batch_size=16, mask=tmask, tune=None)
     with pytest.raises(TypeError):
         txt.get_explanation(tx, lengths=lengths)
     order = txt.get_order(torch.from_numpy(tx), mask=tmask)
     assert (order[:, -1] == -1).any()  # padding ranked last
 
-    img = fit_image(iy, ix, epochs=2, batch_size=16)
+    img = fit_image(iy, ix, epochs=2, batch_size=16, tune=None)
     with pytest.raises(TypeError):
         img.get_explanation(ix, lengths=torch.tensor([6] * 16))
 
@@ -196,18 +196,18 @@ def test_factories_reject_foreign_kwargs(tabular_data, image_data):
     x, y = tabular_data
     ix, _imask, iy = image_data
     with pytest.raises(TypeError, match="l1_penalty"):
-        fit_tabular(y, x, l1_penalty=0.01)
+        fit_tabular(y, x, l1_penalty=0.01, tune=None)
     with pytest.raises(TypeError, match="lengths"):
-        fit(y, x, modality="tabular", lengths=torch.tensor([5] * 64))
+        fit(y, x, modality="tabular", lengths=torch.tensor([5] * 64), tune=None)
     with pytest.raises(TypeError, match="attention_mask"):
-        fit_image(iy, ix, attention_mask=np.ones((16, 6, 6), dtype=bool))
+        fit_image(iy, ix, attention_mask=np.ones((16, 6, 6), dtype=bool), tune=None)
 
 
 def test_explainer_threads_training_hyperparameters(tabular_data, text_data):
     from ruleofthumb import fit_tabular, fit_text
 
     x, y = tabular_data
-    exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, pretrain_epochs=1, weight_decay=0.1)
+    exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, pretrain_epochs=1, weight_decay=0.1, tune=None)
     assert exp.get_explanation(x).shape == (64, 5)
 
     tx, lengths, ty = text_data
@@ -222,6 +222,7 @@ def test_explainer_threads_training_hyperparameters(tabular_data, text_data):
         pretrain_epochs=1,
         weight_decay=0.1,
         l1_penalty=0.05,
+        tune=None,
     )
     assert exp_text.get_explanation(tx, mask=tmask).shape == (32, 6)
 
@@ -231,8 +232,8 @@ def test_explainer_seed_reproducibility(text_data):
 
     x, lengths, y = text_data
     mask = lengths_to_mask(lengths, x.shape[1]).numpy()
-    exp_a = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, seed=0)
-    exp_b = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, seed=0)
+    exp_a = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, seed=0, tune=None)
+    exp_b = fit_text(y, x, epochs=4, batch_size=16, learning_rate=0.01, mask=mask, seed=0, tune=None)
     assert np.allclose(exp_a.get_explanation(x, mask=mask), exp_b.get_explanation(x, mask=mask))
 
 
@@ -240,13 +241,13 @@ def test_explainer_device_parameter(tabular_data, text_data):
     from ruleofthumb import fit_tabular, fit_text
 
     x, y = tabular_data
-    exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, device="cpu")
+    exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, device="cpu", tune=None)
     assert exp.model.a.device.type == "cpu"
     assert exp.get_explanation(x).shape == (64, 5)
 
     tx, lengths, ty = text_data
     tmask = lengths_to_mask(lengths, tx.shape[1]).numpy()
-    exp_text = fit_text(ty, tx, epochs=4, batch_size=16, learning_rate=0.01, mask=tmask, device="cpu")
+    exp_text = fit_text(ty, tx, epochs=4, batch_size=16, learning_rate=0.01, mask=tmask, device="cpu", tune=None)
     assert exp_text.get_explanation(tx, mask=tmask).shape == (32, 6)
 
 
@@ -308,15 +309,15 @@ def test_factories_reject_out_of_range_labels():
     rng = np.random.RandomState(0)
     y_bad = np.array([0, 1, 549, 2, 0, 1])
     with pytest.raises(ValueError, match="n_classes"):
-        fit_tabular(y_bad, rng.rand(6, 3).astype(np.float32), epochs=1, batch_size=6)
+        fit_tabular(y_bad, rng.rand(6, 3).astype(np.float32), epochs=1, batch_size=6, tune=None)
     with pytest.raises(ValueError, match="n_classes"):
-        fit_text(y_bad, rng.rand(6, 4, 3).astype(np.float32), epochs=1, batch_size=6)
+        fit_text(y_bad, rng.rand(6, 4, 3).astype(np.float32), epochs=1, batch_size=6, tune=None)
     with pytest.raises(ValueError, match="n_classes"):
-        fit_image(y_bad, rng.rand(6, 2, 4, 4).astype(np.float32), epochs=1, batch_size=6)
+        fit_image(y_bad, rng.rand(6, 2, 4, 4).astype(np.float32), epochs=1, batch_size=6, tune=None)
     with pytest.raises(ValueError, match="n_classes"):
-        fit_tabular(np.array([0, -1]), rng.rand(2, 3).astype(np.float32), epochs=1, batch_size=2)
+        fit_tabular(np.array([0, -1]), rng.rand(2, 3).astype(np.float32), epochs=1, batch_size=2, tune=None)
     with pytest.raises(ValueError, match="non-empty"):
-        fit_tabular(np.array([], dtype=np.int64), rng.rand(0, 3).astype(np.float32), epochs=1, batch_size=6)
+        fit_tabular(np.array([], dtype=np.int64), rng.rand(0, 3).astype(np.float32), epochs=1, batch_size=6, tune=None)
 
 
 def test_readonly_arrays_convert_silently(tmp_path):
@@ -334,7 +335,7 @@ def test_readonly_arrays_convert_silently(tmp_path):
     assert not xr.flags.writeable
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        exp = fit_tabular(y, xr, epochs=2, batch_size=32, learning_rate=0.05, seed=0)
+        exp = fit_tabular(y, xr, epochs=2, batch_size=32, learning_rate=0.05, seed=0, tune=None)
         imp = exp.get_explanation(xr)
     assert imp.shape == (32, 4)
 
@@ -345,7 +346,7 @@ def test_oversized_batch_warns(tabular_data):
 
     x, y = tabular_data
     with pytest.warns(UserWarning, match="batch_size"):
-        exp = fit_tabular(y, x, epochs=2, batch_size=5000, learning_rate=0.05, seed=0)
+        exp = fit_tabular(y, x, epochs=2, batch_size=5000, learning_rate=0.05, seed=0, tune=None)
     assert len(exp.model.training_loss) == 2
 
 
@@ -357,7 +358,7 @@ def test_fit_quality_warns_on_random_labels():
     x = rng.rand(128, 4).astype(np.float32)
     y = rng.randint(0, 2, 128).astype(np.int64)
     with pytest.warns(UserWarning, match="train agreement"):
-        exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, seed=0)
+        exp = fit_tabular(y, x, epochs=4, batch_size=32, learning_rate=0.05, seed=0, tune=None)
     assert exp.train_agreement_ < 0.75
 
 
@@ -370,7 +371,7 @@ def test_fit_quality_quiet_on_clean_task(tabular_data):
     x, y = tabular_data
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
+        exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0, tune=None)
     assert exp.train_agreement_ >= 0.75
 
 
@@ -387,5 +388,37 @@ def test_fits_run_no_reveal_machinery(tabular_data, monkeypatch):
     monkeypatch.setattr(Explainer, "score_ordering", _forbidden)
 
     x, y = tabular_data
-    exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0)
+    exp = fit_tabular(y, x, epochs=8, batch_size=32, learning_rate=0.05, seed=0, tune=None)
     assert exp.train_agreement_ >= 0.75
+
+
+def test_evaluate_reports_agreement_reveal_and_rationale():
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(0)
+    x = rng.randn(200, 4).astype(np.float32)
+    y = (x[:, 0] > 0).astype(np.int64)                 # only feature 0 matters
+    exp = fit_tabular(y, x, tune=None, epochs=300, learning_rate=0.05, seed=0, n_classes=2)
+
+    base = exp.evaluate(x, y)
+    assert set(base) == {"agreement"} and base["agreement"] > 0.9
+
+    rev = exp.evaluate(x, y, reveal=True, seed=0)
+    assert rev["reveal_gap"] == rev["reveal_auc"] - rev["reveal_auc_random"]
+    assert np.isfinite(rev["reveal_gap"])
+
+    rationales = np.zeros((200, 4), dtype=bool)
+    rationales[:, 0] = True                            # the real signal is feature 0
+    rat = exp.evaluate(x, y, rationales=rationales, seed=0)
+    assert rat["rationale_auroc"] > rat["rationale_auroc_random"]   # importance beats random at finding feature 0
+
+
+def test_evaluate_warns_on_low_agreement():
+    from ruleofthumb import fit_tabular
+
+    rng = np.random.RandomState(0)
+    x = rng.randn(120, 4).astype(np.float32)
+    y = rng.randint(0, 2, size=120).astype(np.int64)   # label is noise -> low agreement
+    exp = fit_tabular(y, x, tune=None, epochs=50, learning_rate=0.05, seed=0, n_classes=2)
+    with pytest.warns(UserWarning, match="low agreement"):
+        exp.evaluate(x, y)
