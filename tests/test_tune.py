@@ -224,3 +224,95 @@ def test_autotune_forwards_model_kwargs():
 
     assert result.explainer.model.nonlinear_spec is not None
     assert set(result.best_params) == set(space)
+
+
+def test_default_space_is_modality_aware():
+    from ruleofthumb.tune import DEFAULT_SPACES
+
+    assert "l1_penalty" in DEFAULT_SPACES["text"]  # text can search it
+    assert "l1_penalty" not in DEFAULT_SPACES["tabular"]  # tabular factory has no such knob
+    x, y = _separable_dataset()
+    with pytest.raises(ValueError, match="unknown hyperparameters in space for tabular"):
+        autotune(y, x, modality="tabular", space={"l1_penalty": [0.0]}, seed=0)
+
+
+def test_oom_candidate_is_skipped_and_search_survives(monkeypatch):
+    from ruleofthumb import tune
+
+    x, y = _separable_dataset()
+    good = tune._FACTORIES["tabular"]
+
+    def flaky(*args, **kwargs):  # lr 0.1 candidates OOM; the rest fit fine
+        if kwargs.get("learning_rate") == 0.1:
+            raise RuntimeError("CUDA out of memory")
+        return good(*args, **kwargs)
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", flaky)
+    space = {"learning_rate": [0.05, 0.1], "epochs": [100], "batch_size": [64]}
+    result = autotune(y, x, modality="tabular", search="grid", space=space, seed=0)
+
+    assert any(t["score"] == float("-inf") and "error" in t for t in result.trials)  # OOM one recorded, not fatal
+    assert result.best_params["learning_rate"] == 0.05  # the good one wins
+
+
+def test_non_oom_error_propagates(monkeypatch):
+    from ruleofthumb import tune
+
+    def bad_kwarg(*args, **kwargs):
+        raise TypeError("unexpected keyword")  # a real bug, not OOM: must not be swallowed
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", bad_kwarg)
+    x, y = _separable_dataset()
+    with pytest.raises(TypeError, match="unexpected keyword"):
+        autotune(y, x, modality="tabular", search="grid",
+                 space={"learning_rate": [0.05], "epochs": [100], "batch_size": [64]}, seed=0)
+
+
+def test_all_candidates_oom_raises(monkeypatch):
+    from ruleofthumb import tune
+
+    def oom(*args, **kwargs):
+        raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", oom)
+    x, y = _separable_dataset()
+    with pytest.raises(RuntimeError, match="every autotune candidate failed"):
+        autotune(y, x, modality="tabular", search="grid",
+                 space={"learning_rate": [0.05], "epochs": [100], "batch_size": [64]}, seed=0)
+
+
+def test_successive_halving_prunes_but_keeps_the_winner():
+    x, y = _separable_dataset()
+    space = {"learning_rate": [1e-5, 1e-4, 0.03, 0.05], "epochs": [60], "batch_size": [64]}  # >=4 -> halving on
+    result = autotune(y, x, modality="tabular", search="grid", space=space, seed=0)
+
+    assert any(t.get("pruned") for t in result.trials)      # the cheap screen abandoned the weak half
+    assert result.best_score > 0.9                           # a good learning rate still won
+    assert result.best_params["learning_rate"] in (0.03, 0.05)
+
+
+def test_tune_flag_attaches_params_only_when_tuning():
+    x, y = _separable_dataset()
+    tuned = fit_tabular(y, x, tune=True, n_classes=2)
+    assert tuned.best_params_ is not None and tuned.best_score_ is not None
+    fixed = fit_tabular(y, x, tune=None, n_classes=2)
+    assert not hasattr(fixed, "best_params_")  # the escape hatch attaches nothing
+
+
+def test_tune_none_and_false_give_the_same_fixed_fit():
+    x, y = _separable_dataset()
+    a = fit_tabular(y, x, tune=None, epochs=50, learning_rate=0.05, seed=0, n_classes=2)
+    b = fit_tabular(y, x, tune=False, epochs=50, learning_rate=0.05, seed=0, n_classes=2)
+    assert np.allclose(a.get_explanation(x), b.get_explanation(x))
+
+
+def test_bad_tune_value_raises():
+    x, y = _separable_dataset()
+    with pytest.raises(TypeError, match="tune must be"):
+        fit_tabular(y, x, tune="yes", n_classes=2)
+
+
+def test_recursion_guard_uses_undecorated_factories():
+    from ruleofthumb import tune
+
+    assert tune._FACTORIES["tabular"] is fit_tabular.__wrapped__  # candidates fit with tuning off
