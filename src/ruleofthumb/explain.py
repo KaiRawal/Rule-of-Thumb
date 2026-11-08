@@ -503,6 +503,9 @@ def fit_tabular(
     n_classes=2,
     device=None,
     nonlinear=None,
+    patience=None,
+    min_delta=1e-3,
+    check_every=10,
     tune=True,
 ):
     """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs.
@@ -510,11 +513,17 @@ def fit_tabular(
     ``tune=True`` (the default) searches the hyperparameters via
     :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit
     with the arguments as given; a dict overrides the autotune options.
+
+    ``patience`` (default ``None`` = off) enables plateau-stop: training ends
+    once train agreement stops improving by ``min_delta`` for ``patience``
+    checks (every ``check_every`` epochs), with ``epochs`` as the max cap. It
+    composes with ``tune`` (each candidate and the refit plateau-stop).
     """
     if tune is not None and tune is not False:
         return _dispatch_tune("tabular", tune, y_outputs, x_inputs,
                               {"seed": seed, "n_classes": n_classes, "device": device,
-                               "nonlinear": nonlinear, "pretrain_epochs": pretrain_epochs})
+                               "nonlinear": nonlinear, "pretrain_epochs": pretrain_epochs,
+                               "patience": patience, "min_delta": min_delta, "check_every": check_every})
     labels = _check_label_range(_as_labels(y_outputs), n_classes)
     model = RoT(n_classes, (x_inputs.shape[1],), device=device, nonlinear=nonlinear)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
@@ -527,6 +536,9 @@ def fit_tabular(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
+        patience=patience,
+        min_delta=min_delta,
+        check_every=check_every,
     )
     return _attach_fit_quality(Explainer(model, "tabular"), _as_float_inputs(x_inputs), labels)
 
@@ -548,6 +560,9 @@ def fit_text(
     n_classes=2,
     device=None,
     nonlinear=None,
+    patience=None,
+    min_delta=1e-3,
+    check_every=10,
     tune=True,
 ):
     """Fit a text :class:`Explainer` on ``(N, tokens, embedding)`` inputs or raw strings.
@@ -569,11 +584,14 @@ def fit_text(
 
     ``tune=True`` (the default) searches the hyperparameters via
     :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
+    ``patience`` (default ``None`` = off) enables plateau-stop (see
+    :func:`fit_tabular`); it composes with ``tune``.
     """
     if tune is not None and tune is not False:
         return _dispatch_tune("text", tune, y_outputs, x_inputs,
                               {"seed": seed, "n_classes": n_classes, "device": device, "nonlinear": nonlinear,
-                               "pretrain_epochs": pretrain_epochs, "mask": mask, "tokenizer": tokenizer, "model": model})
+                               "pretrain_epochs": pretrain_epochs, "mask": mask, "tokenizer": tokenizer, "model": model,
+                               "patience": patience, "min_delta": min_delta, "check_every": check_every})
     string_embedder = None
     if _is_string_batch(x_inputs):
         if mask is not None:
@@ -602,6 +620,9 @@ def fit_text(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
+        patience=patience,
+        min_delta=min_delta,
+        check_every=check_every,
     )
     labels = _as_labels(y_outputs)
     return _attach_fit_quality(
@@ -637,6 +658,9 @@ def fit_image(
     n_classes=2,
     device=None,
     nonlinear=None,
+    patience=None,
+    min_delta=1e-3,
+    check_every=10,
     tune=True,
 ):
     """Fit an image :class:`Explainer` on ``(N, C, H, W)`` inputs or image file paths.
@@ -666,12 +690,15 @@ def fit_image(
 
     ``tune=True`` (the default) searches the hyperparameters via
     :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
+    ``patience`` (default ``None`` = off) enables plateau-stop (see
+    :func:`fit_tabular`); it composes with ``tune``.
     """
     if tune is not None and tune is not False:
         return _dispatch_tune("image", tune, y_outputs, x_inputs,
                               {"seed": seed, "n_classes": n_classes, "device": device, "nonlinear": nonlinear,
                                "pretrain_epochs": pretrain_epochs, "mask": mask, "backbone": backbone,
-                               "size": size, "transform": transform})
+                               "size": size, "transform": transform,
+                               "patience": patience, "min_delta": min_delta, "check_every": check_every})
     image_loader = None
     backbone_id = None
     if _is_string_batch(x_inputs):
@@ -697,6 +724,9 @@ def fit_image(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
+        patience=patience,
+        min_delta=min_delta,
+        check_every=check_every,
     )
     labels = _as_labels(y_outputs)
     explainer = Explainer(rot, "image", image_loader=image_loader)

@@ -172,6 +172,9 @@ class RoTText(RoT):
         pretrain_epochs=5,
         weight_decay=0.01,
         seed=None,
+        patience=None,
+        min_delta=1e-3,
+        check_every=10,
     ):
         # Unlike the tabular ``RoT.fit``: no projection of ``b`` onto the data
         # range, zero initialisation instead of mean-centering, as in the
@@ -190,4 +193,5 @@ class RoTText(RoT):
         self.training_loop(self.loss, points, classifier_response, optimiser, pretrain_epochs, batch_size, mask=mask)
         self.dropout_rate = drop_out
         optimiser = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
-        self.training_loop(self.loss, points, classifier_response, optimiser, epochs, batch_size, mask=mask)
+        self.training_loop(self.loss, points, classifier_response, optimiser, epochs, batch_size, mask=mask,
+                           patience=patience, min_delta=min_delta, check_every=check_every)

@@ -309,3 +309,18 @@ def test_recursion_guard_candidates_fit_with_tuning_off():
     x, y = _separable_dataset()
     result = fit_tabular(y, x, tune=True, n_classes=2)  # would recurse forever without the tune=None guard
     assert result.best_params_ is not None
+
+
+def test_plateau_stop_reaches_fit_through_factory_and_tune():
+    """patience= reaches the fit through the factory (fixed path) and through
+    autotune (refit), trimming below the epoch cap — fit-to-convergence (ToDo 29)."""
+    x, y = _separable_dataset()
+    full = fit_tabular(y, x, n_classes=2, seed=0, epochs=400, tune=None, patience=None)
+    stopped = fit_tabular(y, x, n_classes=2, seed=0, epochs=400, tune=None, patience=3)
+    assert len(full.model.training_loss) == 400  # default off: runs the cap
+    assert len(stopped.model.training_loss) < 400  # fixed path plateau-stops
+
+    tuned = fit_tabular(y, x, n_classes=2, seed=0, patience=3,
+                        tune={"search": "grid", "space": {"learning_rate": [0.05], "epochs": [400], "batch_size": [500]}})
+    assert tuned.best_params_["epochs"] == 400
+    assert len(tuned.model.training_loss) < 400  # refit plateau-stops too

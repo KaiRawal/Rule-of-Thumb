@@ -238,7 +238,9 @@ def autotune(
             ``len(unique(y_outputs))`` when omitted.
         **model_kwargs: forwarded to the factories for both the candidate
             fits and the final refit (e.g. ``nonlinear``, ``l1_penalty``,
-            ``mask``). Sample-aligned array values (a
+            ``mask``, and ``patience`` / ``min_delta`` / ``check_every`` to
+            plateau-stop every candidate and the refit — fit-to-convergence,
+            ToDo 29). Sample-aligned array values (a
             ``mask`` with one entry per sample) are split alongside ``x`` /
             ``y``; scalars, strings and dicts pass through whole.
 
