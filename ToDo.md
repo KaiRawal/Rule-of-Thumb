@@ -432,6 +432,47 @@ are provenance notes only; the legacy code did not move with the package.
     is recorded here as adopt, reject, or follow-up ticket.
     Not started.
 
+44. **Hybrid image + text explanations via concatenated embeddings
+    (research, P3).** Target setting: an image backbone produces one
+    pooled image embedding, while a segmentation model (e.g. SAM) plus
+    an image-to-text describer produce token-wise text embeddings of the
+    described regions; concatenating the two gives a single input whose
+    RoT explanation localises both *where* in the image (saliency over
+    regions) and *which concepts* in the description drive the
+    prediction (token importances) — a hybrid explanation. Motivations:
+    the classic DARPA tank-vs-sky confounding setup (detector keyed on
+    background context rather than the object) and oil-spill detection,
+    where the explanation must justify *why* a given region is judged to
+    contain oil rather than only flagging it. Design left open at
+    implementation time, but the open questions to resolve are: the
+    concatenation scheme (shared embedding space vs separate per-modality
+    blocks with a combined validity mask, since the existing text/image
+    variants assume a single tensor shape), how reveal units stay
+    meaningful across heterogeneous units (image regions vs text tokens)
+    under the unit-granularity default, whether region↔token alignment
+    from the describer is exploited or ignored, and how a single
+    explanation is reported back per modality. A variant worth
+    considering alongside the shared-description scheme: give each
+    SAM-detected region its *own* text description, so the input is a
+    set of region–description pairs rather than one global caption.
+    Descriptions should be prompted to capture holistic concepts
+    (object identity, material, texture, state, context) *in addition
+    to* literal low-level attributes such as colour, shape and size,
+    since the explanation is only as informative as the vocabulary the
+    describer offers — a region described purely as "grey blob" cannot
+    yield a concept-level rationale. This variant sharpens the
+    region↔token alignment question above (each token block belongs to
+    exactly one region by construction) and makes the hybrid report
+    naturally per-region, but costs one describer call per region and
+    needs a policy for overlapping or nested SAM masks (deduplicate?
+    keep a hierarchy?) and for many-region images. Likely needs no new
+    surrogate (the pooled `(K, E)` weights already accept a concatenated
+    representation) — the work is ingestion, mask bookkeeping, and a
+    presentation convention. Cross-ref items 16 (pooled-representation
+    capacity ceiling), 24/25 (fidelity vs plausibility; saliency is not
+    gaze prediction), and 36 (artifact-only protocol). Ambitious, low
+    priority. Not started.
+
 ## Release / maintenance
 
 18. PyPI release checklist: three-place version bump (`pyproject.toml`,
