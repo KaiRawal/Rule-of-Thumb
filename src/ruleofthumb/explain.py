@@ -106,6 +106,38 @@ def _check_label_range(labels, n_classes):
     return labels
 
 
+def _shuffle_order(order, rng):
+    """A random reveal order: keep each row's padding (-1) in place, shuffle its valid unit indices."""
+    out = order.copy().reshape(len(order), -1)
+    for row in out:
+        idx = np.flatnonzero(row >= 0)
+        vals = row[idx]
+        rng.shuffle(vals)
+        row[idx] = vals
+    return out.reshape(order.shape)
+
+
+def _auroc(scores, labels):
+    """Mann-Whitney AUROC with average ranks (no sklearn); nan if one class is empty."""
+    scores, labels = np.asarray(scores, dtype=float), np.asarray(labels)
+    n_pos = int((labels == 1).sum())
+    n_neg = labels.size - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(scores, kind="mergesort")
+    ranks = np.empty(scores.size, dtype=float)
+    ranks[order] = np.arange(1, scores.size + 1)
+    sorted_scores, i = scores[order], 0
+    while i < scores.size:  # average ranks within tied runs
+        j = i
+        while j + 1 < scores.size and sorted_scores[j + 1] == sorted_scores[i]:
+            j += 1
+        if j > i:
+            ranks[order[i : j + 1]] = (i + j + 2) / 2
+        i = j + 1
+    return float((ranks[labels == 1].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+
+
 class Explainer:
     """Fitted Rule-of-Thumb explainer.
 
@@ -268,6 +300,46 @@ class Explainer:
         """See :meth:`ruleofthumb.core.RoT.score_ordering`. Accepts raw strings / file paths."""
         return self._delegate("score_ordering", args, kwargs)
 
+    def evaluate(self, x, y, *, mask=None, reveal=False, rationales=None, seed=0):
+        """Report realised fit-quality measures for this explainer (opt-in, no refit).
+
+        Always returns ``agreement`` (surrogate-vs-label on the given data; below
+        0.75 it also warns). ``reveal=True`` adds ``reveal_auc`` / ``reveal_auc_random``
+        and their difference ``reveal_gap`` (reveal-curve AUC vs a seeded random order).
+        Passing per-unit ``rationales`` (a boolean array shaped like the reveal units:
+        ``(N, T)`` text, ``(N, H, W)`` image, ``(N, D)`` tabular) adds ``rationale_auroc``
+        of the importance magnitudes against them, with a random baseline
+        ``rationale_auroc_random``. Interventions on the black box are never run here.
+        """
+        mk = {"mask": mask} if mask is not None else {}
+        y = np.asarray(y).flatten()
+        preds = np.asarray(self.predict(x, **mk).cpu())
+        agreement = float((preds == y).mean())
+        if agreement < 0.75:
+            warnings.warn(f"low agreement ({agreement:.3f} < 0.75); explanations may be unreliable.", stacklevel=2)
+        out = {"agreement": agreement}
+
+        if reveal:
+            order = np.asarray(self.get_order(x, **mk))
+            yt = torch.from_numpy(y.astype(np.int64))
+            rot_auc = float(np.asarray(self.score_ordering(x, yt, order)).mean())
+            rand_auc = float(np.asarray(self.score_ordering(x, yt, _shuffle_order(order, np.random.RandomState(seed)))).mean())
+            out.update(reveal_auc=rot_auc, reveal_auc_random=rand_auc, reveal_gap=rot_auc - rand_auc)
+
+        if rationales is not None:
+            rationales = np.asarray(rationales)
+            unit = np.abs(self.get_explanation(x, **mk))  # (N, [classes], *unit_dims, [embedding])
+            while unit.ndim > rationales.ndim:            # reduce to the rationale (per-unit) shape
+                if rationales.ndim > 1 and unit.shape[1] == rationales.shape[1]:
+                    unit = unit.sum(axis=-1)              # axis 1 already a unit dim -> extra axis is trailing
+                else:
+                    unit = unit.sum(axis=1)               # axis 1 is the class axis
+            keep = np.asarray(mask).astype(bool) if mask is not None else np.ones(rationales.shape, dtype=bool)
+            labels = rationales[keep].ravel().astype(int)
+            out["rationale_auroc"] = _auroc(unit[keep].ravel(), labels)
+            out["rationale_auroc_random"] = _auroc(np.random.RandomState(seed).rand(labels.size), labels)
+        return out
+
     def save(self, path):
         """Persist this explainer to ``path`` for reloading without refitting.
 
@@ -360,6 +432,36 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
     return explainer
 
 
+_TUNE_OPTIONS = frozenset({"space", "n_candidates", "scoring", "search", "validation_split"})
+
+
+def _dispatch_tune(modality, tune, y_outputs, x_inputs, passthrough):
+    """Search this modality's hyperparameters via :func:`ruleofthumb.autotune` and return the tuned explainer.
+
+    Called by the factories when ``tune`` is ``True`` or a dict (``None`` /
+    ``False`` run the fixed fit instead). A dict overrides ``space`` /
+    ``n_candidates`` / ``scoring`` / ``search`` / ``validation_split``. The
+    non-searched arguments (``seed``, ``n_classes``, ``device``, ``mask``,
+    backbone/tokenizer, ...) ride along in ``passthrough``; the searched
+    hyperparameters come from the space, so values passed for them are not
+    pinned (use ``tune=None`` or a one-value ``space`` to fix one). ``autotune``
+    refits candidates through the same factory with ``tune=None`` — the
+    recursion guard. The result carries ``best_params_`` / ``best_score_``.
+    """
+    if tune is not True and not isinstance(tune, dict):
+        raise TypeError(f"tune must be True, False, None or a dict of autotune options, got {tune!r}")
+    options = {} if tune is True else dict(tune)
+    unknown = set(options) - _TUNE_OPTIONS
+    if unknown:
+        raise ValueError(f"unknown tune options: {sorted(unknown)}; expected a subset of {sorted(_TUNE_OPTIONS)}")
+    from ruleofthumb.tune import autotune
+
+    result = autotune(y_outputs, x_inputs, modality=modality, **options, **passthrough)
+    explainer = result.explainer
+    explainer.best_params_, explainer.best_score_ = result.best_params, result.best_score
+    return explainer
+
+
 def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
     """Fit an :class:`Explainer` to black-box outputs, auto-detecting the modality.
 
@@ -369,7 +471,8 @@ def fit(y_outputs, x_inputs, *, modality="auto", **kwargs):
     4 → image ``(N, C, H, W)``. Pass ``modality="tabular" | "text" | "image"``
     explicitly to override. The remaining keyword arguments are forwarded to
     the matching factory (:func:`fit_tabular`, :func:`fit_text` or
-    :func:`fit_image`).
+    :func:`fit_image`), including ``tune=`` (default ``True``: search the
+    hyperparameters; ``tune=None`` runs the fixed fit).
     """
     if modality == "auto":
         if _is_path_batch(x_inputs):
@@ -400,8 +503,27 @@ def fit_tabular(
     n_classes=2,
     device=None,
     nonlinear=None,
+    patience=None,
+    min_delta=1e-3,
+    check_every=10,
+    tune=True,
 ):
-    """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs."""
+    """Fit a tabular :class:`Explainer` on ``(N, d)`` feature inputs.
+
+    ``tune=True`` (the default) searches the hyperparameters via
+    :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit
+    with the arguments as given; a dict overrides the autotune options.
+
+    ``patience`` (default ``None`` = off) enables plateau-stop: training ends
+    once train agreement stops improving by ``min_delta`` for ``patience``
+    checks (every ``check_every`` epochs), with ``epochs`` as the max cap. It
+    composes with ``tune`` (each candidate and the refit plateau-stop).
+    """
+    if tune is not None and tune is not False:
+        return _dispatch_tune("tabular", tune, y_outputs, x_inputs,
+                              {"seed": seed, "n_classes": n_classes, "device": device,
+                               "nonlinear": nonlinear, "pretrain_epochs": pretrain_epochs,
+                               "patience": patience, "min_delta": min_delta, "check_every": check_every})
     labels = _check_label_range(_as_labels(y_outputs), n_classes)
     model = RoT(n_classes, (x_inputs.shape[1],), device=device, nonlinear=nonlinear)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
@@ -414,6 +536,9 @@ def fit_tabular(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
+        patience=patience,
+        min_delta=min_delta,
+        check_every=check_every,
     )
     return _attach_fit_quality(Explainer(model, "tabular"), _as_float_inputs(x_inputs), labels)
 
@@ -435,6 +560,10 @@ def fit_text(
     n_classes=2,
     device=None,
     nonlinear=None,
+    patience=None,
+    min_delta=1e-3,
+    check_every=10,
+    tune=True,
 ):
     """Fit a text :class:`Explainer` on ``(N, tokens, embedding)`` inputs or raw strings.
 
@@ -452,7 +581,17 @@ def fit_text(
 
     Explainers fitted from strings accept the same strings back in every
     public method; each call re-embeds the texts.
+
+    ``tune=True`` (the default) searches the hyperparameters via
+    :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
+    ``patience`` (default ``None`` = off) enables plateau-stop (see
+    :func:`fit_tabular`); it composes with ``tune``.
     """
+    if tune is not None and tune is not False:
+        return _dispatch_tune("text", tune, y_outputs, x_inputs,
+                              {"seed": seed, "n_classes": n_classes, "device": device, "nonlinear": nonlinear,
+                               "pretrain_epochs": pretrain_epochs, "mask": mask, "tokenizer": tokenizer, "model": model,
+                               "patience": patience, "min_delta": min_delta, "check_every": check_every})
     string_embedder = None
     if _is_string_batch(x_inputs):
         if mask is not None:
@@ -481,11 +620,25 @@ def fit_text(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
+        patience=patience,
+        min_delta=min_delta,
+        check_every=check_every,
     )
     labels = _as_labels(y_outputs)
     return _attach_fit_quality(
         Explainer(rot, "text", string_embedder=string_embedder), _as_float_inputs(x_inputs), labels, mask=mask
     )
+
+
+def _path_loader(backbone, size, transform):
+    """Loader for image file paths plus the backbone id recorded for provenance."""
+    if backbone == "auto":
+        backbone = DEFAULT_IMAGE_MODEL
+    if backbone is None:
+        return functools.partial(load_images, size=size, transform=transform), None
+    if transform is not None:
+        raise ValueError("backbone owns preprocessing; pass transform=None or backbone=None")
+    return functools.partial(embed_images, backbone=backbone, size=size), backbone if isinstance(backbone, str) else None
 
 
 def fit_image(
@@ -505,6 +658,10 @@ def fit_image(
     n_classes=2,
     device=None,
     nonlinear=None,
+    patience=None,
+    min_delta=1e-3,
+    check_every=10,
+    tune=True,
 ):
     """Fit an image :class:`Explainer` on ``(N, C, H, W)`` inputs or image file paths.
 
@@ -530,21 +687,24 @@ def fit_image(
     method; each call re-loads (and re-embeds) the files. A reloaded
     explainer consumes numeric arrays; the backbone id is recorded in
     ``explainer.backbone`` and the save file for provenance.
+
+    ``tune=True`` (the default) searches the hyperparameters via
+    :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
+    ``patience`` (default ``None`` = off) enables plateau-stop (see
+    :func:`fit_tabular`); it composes with ``tune``.
     """
+    if tune is not None and tune is not False:
+        return _dispatch_tune("image", tune, y_outputs, x_inputs,
+                              {"seed": seed, "n_classes": n_classes, "device": device, "nonlinear": nonlinear,
+                               "pretrain_epochs": pretrain_epochs, "mask": mask, "backbone": backbone,
+                               "size": size, "transform": transform,
+                               "patience": patience, "min_delta": min_delta, "check_every": check_every})
     image_loader = None
     backbone_id = None
     if _is_string_batch(x_inputs):
         if mask is not None:
             raise ValueError("raw image files derive their padding automatically; pass mask=None")
-        if backbone == "auto":
-            backbone = DEFAULT_IMAGE_MODEL
-        if backbone is None:
-            image_loader = functools.partial(load_images, size=size, transform=transform)
-        else:
-            if transform is not None:
-                raise ValueError("backbone owns preprocessing; pass transform=None or backbone=None")
-            image_loader = functools.partial(embed_images, backbone=backbone, size=size)
-            backbone_id = backbone if isinstance(backbone, str) else None
+        image_loader, backbone_id = _path_loader(backbone, size, transform)
         loaded = image_loader(list(x_inputs))
         x_inputs = loaded.maps if hasattr(loaded, "maps") else loaded.images
         mask = torch.from_numpy(loaded.mask)
@@ -564,6 +724,9 @@ def fit_image(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
+        patience=patience,
+        min_delta=min_delta,
+        check_every=check_every,
     )
     labels = _as_labels(y_outputs)
     explainer = Explainer(rot, "image", image_loader=image_loader)

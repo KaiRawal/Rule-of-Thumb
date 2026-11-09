@@ -43,7 +43,7 @@ def _iter_words(encoded, tokenizer, i):
 
 
 def _fit_text(embeddings, attention_mask, y):
-    return fit_text(y, embeddings, mask=attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    return fit_text(y, embeddings, mask=attention_mask, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
 
 def test_black_box_predictions_are_confident(text_sst2):
@@ -189,7 +189,7 @@ def test_native_string_ingestion_end_to_end(text_sst2):
     # 50 epochs (not 200): shorter fits resist cross-host BLAS amplification —
     # validated invariant under ulp-noise and thread-count proxies, where the
     # 200-epoch fit intermittently collapses (0.65 on some hosts).
-    exp = fit_text(y, texts, epochs=50, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    exp = fit_text(y, texts, epochs=50, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
 
     embedded = embed_texts(texts, DEFAULT_TEXT_MODEL, device=TEST_DEVICE)
     imp = exp.get_explanation(texts)
@@ -233,9 +233,9 @@ def test_native_path_equals_array_path(text_sst2):
     texts, y = text_sst2["texts"], text_sst2["y"]
     emb = embed_texts(texts, tokenizer=tokenizer, model=backbone, max_length=48, device=TEST_DEVICE)
 
-    native = fit_text(y, texts, tokenizer=tokenizer, model=backbone, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE)
+    native = fit_text(y, texts, tokenizer=tokenizer, model=backbone, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE)
     arrays = fit_text(
-        y, emb.embeddings, mask=emb.attention_mask, epochs=200, batch_size=500, learning_rate=0.05, seed=SEED, device=TEST_DEVICE
+        y, emb.embeddings, mask=emb.attention_mask, epochs=200, batch_size=500, learning_rate=0.05, tune=None, seed=SEED, device=TEST_DEVICE
     )
 
     imp_native = native.get_explanation(texts)

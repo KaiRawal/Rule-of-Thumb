@@ -97,5 +97,5 @@ def test_interacting_trips_quality_wire():
     x = rng.rand(500, 5).astype(np.float32)
     y = ((x[:, 0] > 0.5) ^ (x[:, 1] > 0.5)).astype(np.int64)
     with pytest.warns(UserWarning, match="train agreement"):
-        exp = fit_tabular(y, x, epochs=30, batch_size=64, learning_rate=0.05, seed=0)
+        exp = fit_tabular(y, x, epochs=30, batch_size=64, learning_rate=0.05, seed=0, tune=None)
     assert exp.train_agreement_ < 0.75
