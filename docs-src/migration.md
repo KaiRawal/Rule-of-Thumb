@@ -3,6 +3,22 @@
 Breaking changes across the 0.x line. The package is pre-1.0: breaking
 API changes are acceptable, each one recorded here.
 
+## Migrating to tuning by default (unreleased, ToDo 37)
+
+`fit`, `fit_tabular`, `fit_text` and `fit_image` now search the training
+hyperparameters before fitting (`tune=True`). Fits are slower, and
+`learning_rate` / `batch_size` / `epochs` / `weight_decay` (and text's
+`l1_penalty`) come from the search rather than from your arguments. Pass
+`tune=None` to keep the previous fixed fit:
+
+```python
+exp = rot.fit_tabular(y, X, epochs=50, batch_size=500, learning_rate=0.05, tune=None)
+```
+
+`ruleofthumb.tune.DEFAULT_SPACE` is replaced by the per-modality
+`DEFAULT_SPACES`. New and opt-in: `patience=` / `min_delta=` /
+`check_every=` plateau stopping, and `Explainer.evaluate(...)`.
+
 ## Migrating to v0.0.2
 
 v0.0.2 removes the deprecated padding spellings: `lengths=` and

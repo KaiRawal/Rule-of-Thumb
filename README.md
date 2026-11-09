@@ -222,9 +222,9 @@ black box)? Supply `transform=` (a PIL Image → tensor callable) with
 ### Automatic hyperparameter tuning
 
 `rot.autotune` searches the training hyperparameters
-(`learning_rate`, `batch_size`, `epochs`, `weight_decay`)
-with a seeded validation split, scores candidates by held-out reveal
-fidelity, and returns the winner refit on all data:
+(`learning_rate`, `batch_size`, `epochs`, `weight_decay`, plus `l1_penalty`
+for text) with a seeded validation split, scores candidates by held-out
+surrogate-vs-label agreement, and returns the winner refit on all data:
 
 ```python
 result = rot.autotune(y_outputs=labels, x_inputs=x, search="random",
@@ -240,11 +240,71 @@ and image paths. `n_classes` is inferred from the labels; any other factory
 keyword (`nonlinear`, `l1_penalty`, `mask`, ...) is forwarded to both the
 candidate fits and the final refit. Dropout is not searched — it is fixed
 at 0.5 by the method (every partial observation equally likely).
+`scoring="reveal"` scores candidates by final-step reveal accuracy instead
+of plain agreement.
 
-The factory defaults (`epochs=500, batch_size=5000`) suit tiny inputs.
+Each modality has its own default search space
+(`ruleofthumb.tune.DEFAULT_SPACES`): text searches much smaller learning
+rates and batches, tabular longer fits. With four or more candidates the
+search runs cheaply first (successive halving): each candidate trains for
+about a third of its epochs and only the better half finishes. A candidate
+that runs out of memory is recorded in `trials` and skipped; the search
+fails only if every candidate does. Raw strings and image paths are
+embedded once for the whole search.
+
+#### Every fit runs `rot.autotune` by default
+
+`fit`, `fit_tabular`, `fit_text` and `fit_image` call `rot.autotune` for
+you (`tune=True` is the default) and return the refit winner with the
+search's outcome attached. `tune=None` (or `False`) runs the fixed fit with
+the arguments as given; with `tune=True` the searched settings come from
+the search space, so values passed for them are not used. A dict passes
+options through to `rot.autotune` (`search`, `space`, `n_candidates`,
+`scoring`, `validation_split`; unknown keys raise):
+
+```python
+exp = rot.fit_tabular(labels, X, seed=0)    # runs rot.autotune, then refits the best settings
+exp.best_params_    # same as result.best_params
+exp.best_score_     # its held-out agreement
+
+exp = rot.fit_tabular(labels, X, tune={"search": "grid", "space": {"epochs": [100, 300]}})
+
+fixed = rot.fit_tabular(labels, X, epochs=50, batch_size=500, learning_rate=0.05,
+                        seed=0, tune=None)  # no search: exactly these settings
+```
+
+The fixed-fit defaults (`epochs=500, batch_size=5000`) suit tiny inputs.
 Scale them to the data: small tabular batches fit anywhere, while 96px
 images want `batch_size=16–64` with modest epochs. A `batch_size` larger
 than N warns (training runs full-batch).
+
+### Stopping when the fit plateaus
+
+`patience=` (off by default) stops training once train agreement stops
+improving: it is checked every `check_every` epochs (default 10), and
+training ends after `patience` checks without a gain of at least
+`min_delta` (default `1e-3`). `epochs` then acts as the upper limit. It
+works with both paths: with `tune=True` every candidate and the final
+refit stop early.
+
+```python
+exp = rot.fit_tabular(labels, X, epochs=2000, patience=3, seed=0, tune=None)
+```
+
+### Measuring fit quality
+
+`Explainer.evaluate(x, y)` reports how well a fitted explainer copies the
+black box on any data you pass (ideally held out). It never refits.
+
+```python
+report = exp.evaluate(X_test, y_test)                   # {"agreement": ...}; warns below 0.75
+report = exp.evaluate(X_test, y_test, reveal=True)      # + reveal_auc, reveal_auc_random, reveal_gap
+report = exp.evaluate(X_test, y_test, rationales=mask)  # + rationale_auroc vs a random baseline
+```
+
+`reveal_gap` is the reveal-curve area minus that of a seeded random order;
+`rationales` is a boolean array of human-marked units shaped like the
+reveal units (`(N, T)` text, `(N, H, W)` images, `(N, D)` tabular).
 
 ### Saving and loading
 
@@ -346,6 +406,22 @@ training internals (`importance`, `stochastic_importance`,
 exp = rot.fit(y_outputs=labels, x_inputs=X, device="cuda")  # or "mps", "cpu", ...
 ```
 
+## Migrating to tuning by default (unreleased, ToDo 37)
+
+`fit`, `fit_tabular`, `fit_text` and `fit_image` now search the training
+hyperparameters before fitting (`tune=True`), so fits are slower and
+`learning_rate` / `batch_size` / `epochs` / `weight_decay` (and text's
+`l1_penalty`) come from the search rather than from your arguments. To keep
+the previous behaviour, pass `tune=None`:
+
+```python
+exp = rot.fit_tabular(y, X, epochs=50, batch_size=500, learning_rate=0.05, tune=None)
+```
+
+`ruleofthumb.tune.DEFAULT_SPACE` is replaced by the per-modality
+`DEFAULT_SPACES`. New, all opt-in: `patience=` / `min_delta=` /
+`check_every=` plateau stopping and `Explainer.evaluate(...)`.
+
 ## Migrating to v0.0.2
 
 v0.0.2 removes the deprecated padding spellings: `lengths=` and
@@ -425,10 +501,11 @@ custom callable over the binary counts `(tp, fp, fn, tn)`.
 
 - **Rectangular batches.** Inputs are stored as rectangular tensors; use
   `pad_sequences` / `pad_images` plus masks for ragged or mixed-size data.
-- **Memory on real-size inputs.** Factory defaults (`epochs=500`,
-  `batch_size=5000`) suit toy data; on real datasets pass explicit small
-  values (e.g. 96px images: `epochs=30`, `batch_size=16-64`) and keep
-  inputs in uint8 on disk, converting per batch. Batches larger than `N`
+- **Memory on real-size inputs.** The fixed-fit defaults (`tune=None`:
+  `epochs=500`, `batch_size=5000`) suit toy data; on real datasets either
+  keep the default search or pass explicit small values (e.g. 96px images:
+  `epochs=30`, `batch_size=16-64`), and keep inputs in uint8 on disk,
+  converting per batch. Batches larger than `N`
   warn and run full-batch.
 - Reveal-curve granularity must match between `get_order` and
   `ordered_predict` / `score_ordering` (no auto-detection of the order's
