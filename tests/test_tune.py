@@ -292,6 +292,28 @@ def test_successive_halving_prunes_but_keeps_the_winner():
     assert result.best_params["learning_rate"] in (0.03, 0.05)
 
 
+def test_pruned_candidate_cannot_win_on_its_screen_score(monkeypatch):
+    from ruleofthumb import tune
+
+    x, y = _separable_dataset()
+    screen_scores = {0.01: 0.9, 0.02: 0.8, 0.03: 0.7, 0.04: 0.6}  # lr 0.03 / 0.04 are pruned
+
+    def record(y_outputs, x_inputs, **kwargs):  # stand-in fit: the "explainer" is just its settings
+        return kwargs
+
+    def score(candidate, x_val, y_val, mask=None):  # screens (10 epochs) score high, full fits (30) low
+        return screen_scores[candidate["learning_rate"]] if candidate["epochs"] == 10 else 0.5
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", record)
+    monkeypatch.setitem(tune._SCORINGS, "agreement", score)
+    space = {"learning_rate": list(screen_scores), "epochs": [30]}
+    result = autotune(y, x, modality="tabular", search="grid", space=space, seed=0)
+
+    assert result.best_params["learning_rate"] in (0.01, 0.02)  # a finished candidate, not lr 0.03's 0.7 screen
+    assert result.best_score == 0.5                             # a full-epoch score
+    assert result.explainer["epochs"] == 30
+
+
 def test_tune_flag_attaches_params_only_when_tuning():
     x, y = _separable_dataset()
     tuned = fit_tabular(y, x, tune=True, n_classes=2)

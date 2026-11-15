@@ -295,7 +295,8 @@ def autotune(
     seeds = [None if seed is None else seed + i for i in range(len(candidates))]
     if len(candidates) >= 4:
         # Successive halving (ToDo 29): screen every candidate at ~1/3 of its epochs, then finish only the
-        # better-scoring half at full epochs. Abandoned candidates keep their cheap screen score.
+        # better-scoring half at full epochs. Pruned candidates stay in the record with their screen score, but
+        # cannot win: a 1/3-epoch score is not comparable to a full-epoch one.
         # ponytail: fixed 1/3 rung and top-half keep; a multi-rung schedule only pays off past ~tens of candidates.
         screen = [evaluate(p, s, epochs=max(1, p.get("epochs", 300) // 3)) for p, s in zip(candidates, seeds)]
         ranked = sorted(range(len(candidates)), key=lambda j: screen[j]["score"], reverse=True)
@@ -304,10 +305,12 @@ def autotune(
                   for j in range(len(candidates))]
     else:
         trials = [evaluate(p, s) for p, s in zip(candidates, seeds)]
-    if all(trial["score"] == float("-inf") for trial in trials):
+    if all(trial["score"] == float("-inf") for trial in trials if not trial.get("pruned")):
         raise RuntimeError("every autotune candidate failed; see trial['error'] in the result's .trials")
-    # best score first; ties break toward the cheaper fit (fewer epochs, then larger batch) for determinism
-    trials.sort(key=lambda trial: (-trial["score"], trial["params"].get("epochs", 0), -trial["params"].get("batch_size", 0)))
+    # finished candidates first (only they can win), then best score; ties break toward the cheaper fit
+    # (fewer epochs, then larger batch) for determinism
+    trials.sort(key=lambda trial: (trial.get("pruned", False), -trial["score"], trial["params"].get("epochs", 0),
+                                   -trial["params"].get("batch_size", 0)))
 
     best = trials[0]
     explainer = factory(y_outputs, x_inputs, tune=None, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
