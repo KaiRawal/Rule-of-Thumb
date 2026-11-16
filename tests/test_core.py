@@ -254,6 +254,21 @@ def test_score_ordering_rejects_mismatched_sample_counts(tabular_data):
         model.score_ordering(xt[:10], y, order)
 
 
+def test_plateau_stop_halts_early_and_default_runs_full(tabular_data):
+    """Opt-in plateau-stop ends once train agreement stops improving; the
+    default (``patience=None``) still runs the full epoch cap (ToDo 29)."""
+    x, y = tabular_data
+    xt = torch.from_numpy(x)
+
+    def epochs_run(patience):
+        model = RoT(2, (5,), device="cpu")
+        model.fit(xt, y, epochs=300, batch_size=64, lr=0.05, seed=0, patience=patience)
+        return len(model.training_loss)
+
+    assert epochs_run(None) == 300  # default off: unchanged behaviour
+    assert epochs_run(3) < 300  # trivially separable -> agreement plateaus, stops early
+
+
 def test_inference_methods_return_host_side_tensors(tabular_data):
     """score/predict/ordered_predict are host-side regardless of device (sandbox Bug 8)."""
     x, y = tabular_data

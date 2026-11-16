@@ -34,7 +34,7 @@ from ruleofthumb import plot
 rng = np.random.RandomState(0)
 X = rng.rand(1000, 4).astype(np.float32)
 y_answers = ((X[:, 0] + X[:, 1]) > 1.0).astype(np.int64)
-exp = rot.fit_tabular(y_answers, X, epochs=30, seed=0)
+exp = rot.fit_tabular(y_answers, X, seed=0)
 names = ["size", "age", "zip", "color"]
 ```
 

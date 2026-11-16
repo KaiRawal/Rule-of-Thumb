@@ -17,7 +17,7 @@ def test_default_path_unchanged():
     assert model.nonlinear_spec is None
     assert not any(key.startswith("response") for key in model.state_dict())
 
-    explainer = fit_tabular(np.zeros(4, dtype=np.int64), np.zeros((4, 3)), epochs=1, seed=0)
+    explainer = fit_tabular(np.zeros(4, dtype=np.int64), np.zeros((4, 3)), epochs=1, seed=0, tune=None)
     assert explainer.model.response is None
 
 
@@ -117,7 +117,7 @@ def test_nonlinear_fit_separates_ring_linear_cannot(nonlinear):
 
 def test_reveal_pipeline_works_with_nonlinear():
     x, y = _ring_data(100, seed=1)
-    explainer = fit_tabular(y, x, epochs=60, batch_size=100, learning_rate=0.05, seed=0, device="cpu", nonlinear="rbf")
+    explainer = fit_tabular(y, x, epochs=60, batch_size=100, learning_rate=0.05, seed=0, device="cpu", nonlinear="rbf", tune=None)
     xt, yt = torch.from_numpy(x), torch.from_numpy(y)
     order = explainer.get_order(xt)
     curve = explainer.score_ordering(xt, yt, order)
@@ -128,7 +128,7 @@ def test_reveal_pipeline_works_with_nonlinear():
 def test_persistence_round_trip(tmp_path):
     x, y = _ring_data(120, seed=2)
     explainer = fit_tabular(
-        y, x, epochs=80, batch_size=120, learning_rate=0.05, seed=0, device="cpu", nonlinear={"type": "rbf", "n_bases": 8}
+        y, x, epochs=80, batch_size=120, learning_rate=0.05, tune=None, seed=0, device="cpu", nonlinear={"type": "rbf", "n_bases": 8}
     )
     path = tmp_path / "explainer.pt"
     explainer.save(path)

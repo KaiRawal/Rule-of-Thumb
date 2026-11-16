@@ -31,7 +31,7 @@ def _fit_pets(features, y_gpt):
     # The anchor comparison loads committed weights instead: the 300-epoch
     # fit amplifies last-ulp BLAS differences across hosts, so fresh fits
     # cannot reproduce a committed anchor exactly on every machine.
-    return fit_image(y_gpt, features, epochs=300, batch_size=5000, learning_rate=0.05, seed=SEED, device="cpu")
+    return fit_image(y_gpt, features, epochs=300, batch_size=5000, learning_rate=0.05, tune=None, seed=SEED, device="cpu")
 
 
 def _load_pets_explainer():

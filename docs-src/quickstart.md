@@ -24,10 +24,12 @@ y_answers = ((X[:, 0] + X[:, 1]) > 1.0).astype(np.int64)  # e.g. model.predict(X
 ## Fitting the stand-in
 
 `fit_tabular` learns a small model whose only job is to copy those
-answers:
+answers. It first tries a few training settings and keeps the one that
+copies best ([more on tuning](workflows.md)); pass `tune=None` with your
+own `epochs=` for a quick fixed fit:
 
 ```python
-exp = rot.fit_tabular(y_answers, X, epochs=30, seed=0)
+exp = rot.fit_tabular(y_answers, X, seed=0)
 print(f"agreement: {exp.train_agreement_:.2f}")  # stand-in vs box, want ~1.0
 ```
 

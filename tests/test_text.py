@@ -155,7 +155,7 @@ def test_facade_multiclass_reveal_pipeline_matches_manual_counts():
 
     x, lengths, y = _multiclass_text_data()
     exp = fit_text(
-        y, x, mask=lengths_to_mask(lengths, x.shape[1]).numpy(), epochs=8, batch_size=16, learning_rate=0.01, seed=0, n_classes=3
+        y, x, mask=lengths_to_mask(lengths, x.shape[1]).numpy(), epochs=8, batch_size=16, learning_rate=0.01, tune=None, seed=0, n_classes=3
     )
     assert exp.model.classes == 3
 
@@ -191,9 +191,9 @@ def test_facade_mask_tensor_and_array_agree():
     x, lengths, y = _multiclass_text_data()
     mask = lengths_to_mask(lengths, x.shape[1])
     kwargs = {"epochs": 4, "batch_size": 16, "learning_rate": 0.01, "seed": 0, "n_classes": 3}
-    by_tensor = fit_text(y, x, mask=mask, **kwargs)
+    by_tensor = fit_text(y, x, mask=mask, **kwargs, tune=None)
     torch.manual_seed(0)
-    by_array = fit_text(y, x, mask=mask.numpy(), **kwargs)
+    by_array = fit_text(y, x, mask=mask.numpy(), **kwargs, tune=None)
     assert np.allclose(by_tensor.get_explanation(x, mask=mask), by_array.get_explanation(x, mask=mask.numpy()))
 
 
@@ -203,8 +203,8 @@ def test_facade_multiclass_seed_reproducibility():
     x, lengths, y = _multiclass_text_data()
     mask = lengths_to_mask(lengths, x.shape[1]).numpy()
     kwargs = {"epochs": 4, "batch_size": 16, "learning_rate": 0.01, "seed": 0, "n_classes": 3}
-    exp_a = fit_text(y, x, mask=mask, **kwargs)
-    exp_b = fit_text(y, x, mask=mask, **kwargs)
+    exp_a = fit_text(y, x, mask=mask, **kwargs, tune=None)
+    exp_b = fit_text(y, x, mask=mask, **kwargs, tune=None)
     assert np.allclose(exp_a.get_explanation(x, mask=mask), exp_b.get_explanation(x, mask=mask))
 
 
@@ -214,7 +214,7 @@ def test_facade_get_order_takes_mask_only():
 
     x, lengths, y = _multiclass_text_data()
     mask = lengths_to_mask(lengths, x.shape[1])
-    exp = fit_text(y, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.01, seed=0, n_classes=3)
+    exp = fit_text(y, x, mask=mask.numpy(), epochs=4, batch_size=16, learning_rate=0.01, seed=0, n_classes=3, tune=None)
 
     order = exp.get_order(torch.from_numpy(x), mask=mask)
     for i, length in enumerate(lengths.tolist()):

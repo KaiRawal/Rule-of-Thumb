@@ -1,32 +1,69 @@
 """Automatic hyperparameter tuning for RoT explainers.
 
 Keras-tuner-style search over the exposed training hyperparameters
-(``learning_rate``, ``batch_size``, ``epochs``, ``weight_decay``):
-candidates are fitted on a seeded train split, scored on held-out data
-(by plain agreement unless ``scoring="reveal"`` is named), and the
-winner is refit on all data. Dropout is
-a fixed method constant (0.5) and is never searched.
+(``learning_rate``, ``batch_size``, ``epochs``, ``weight_decay``, plus
+``l1_penalty`` for text): candidates are fitted on a seeded train split,
+scored on held-out data (by plain agreement unless ``scoring="reveal"`` is
+named), and the winner is refit on all data. The default search space is
+per-modality (:data:`DEFAULT_SPACES`) so each one reaches its own working
+regime. With four or more candidates the search screens them cheaply and finishes only
+the better half (successive halving). A candidate that errors out (e.g. OOM) is recorded and skipped, not
+fatal. Dropout is a fixed method constant (0.5) and is never searched.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import itertools
+import os
+import shutil
+import tempfile
 from typing import Any
 
 import numpy as np
 import torch
 
-from ruleofthumb.explain import Explainer, _is_path_batch, _is_string_batch, fit_image, fit_tabular, fit_text
+from ruleofthumb.embed import embed_texts
+from ruleofthumb.explain import (
+    Explainer,
+    _is_path_batch,
+    _is_string_batch,
+    _path_loader,
+    fit_image,
+    fit_tabular,
+    fit_text,
+)
 
-DEFAULT_SPACE = {
-    "learning_rate": [0.003, 0.01, 0.03, 0.1],
-    "batch_size": [64, 500, 2000],
-    "epochs": [100, 300, 600],
-    "weight_decay": [0.0, 0.01, 0.05],
+# Per-modality so the search can actually reach each one's working regime: text needs
+# much smaller learning rates and batches (and l1 off), tabular needs the low rates and
+# long fits the papers used. Ranges, not exact paper lookups.
+DEFAULT_SPACES = {
+    "tabular": {
+        "learning_rate": [0.005, 0.01, 0.05, 0.1],
+        "batch_size": [64, 500, 2000],
+        "epochs": [100, 500, 1500],
+        "weight_decay": [0.0, 0.01, 0.05],
+    },
+    "text": {
+        "learning_rate": [1e-6, 1e-5, 1e-4, 0.01],
+        "batch_size": [16, 32, 64],
+        "epochs": [35, 100, 300],
+        "weight_decay": [0.0, 0.01],
+        "l1_penalty": [0.0, 0.01],
+    },
+    "image": {
+        "learning_rate": [0.003, 0.01, 0.05],
+        "batch_size": [500, 2000, 5000],
+        "epochs": [100, 300, 600],
+        "weight_decay": [0.0, 0.01, 0.05],
+    },
 }
 
-_FACTORIES = {"tabular": fit_tabular, "text": fit_text, "image": fit_image}
+# the undecorated factories: candidates never tune again (recursion guard for ``tune=True``)
+_FACTORIES = {"tabular": fit_tabular, "text": fit_text, "image": fit_image}  # called with tune=None: the recursion guard
+_LOADER_KWARGS = ("tokenizer", "model", "backbone", "size", "transform")
+# plateau-stop patience while tuning when the caller leaves ``patience`` at its default ("auto")
+TUNE_PATIENCE = 3
 
 
 @dataclasses.dataclass(frozen=True)
@@ -92,6 +129,14 @@ def _subset(inputs, indices):
     return inputs[indices]
 
 
+def _is_oom(exc):
+    """True for an out-of-memory error (CUDA or CPU); the only candidate failure autotune skips."""
+    if isinstance(exc, MemoryError):
+        return True
+    message = str(exc).lower()
+    return isinstance(exc, RuntimeError) and any(s in message for s in ("out of memory", "allocate"))
+
+
 def _split_value(value, indices, n):
     """Split a sample-aligned ``autotune`` kwarg alongside ``x`` / ``y``; pass the rest through."""
     if value is None or isinstance(value, (str, dict)):
@@ -107,6 +152,37 @@ def _split_value(value, indices, n):
 
 def _split_kwargs(kwargs, indices, n):
     return {key: _split_value(value, indices, n) for key, value in kwargs.items()}
+
+
+def _embed_once(modality, x_inputs, model_kwargs, device):
+    """Embed raw strings / image paths once so candidates fit arrays instead of re-embedding each time."""
+    if modality == "text":
+        embedded = embed_texts(
+            list(x_inputs), tokenizer=model_kwargs.get("tokenizer"), model=model_kwargs.get("model"), device=device
+        )
+        arrays, mask = embedded.embeddings, embedded.attention_mask
+    else:
+        loader, _ = _path_loader(
+            model_kwargs.get("backbone", "auto"), model_kwargs.get("size"), model_kwargs.get("transform")
+        )
+        loaded = loader(list(x_inputs))
+        arrays, mask = (loaded.maps if hasattr(loaded, "maps") else loaded.images), loaded.mask
+    kwargs = {key: value for key, value in model_kwargs.items() if key not in _LOADER_KWARGS}
+    return arrays, {**kwargs, "mask": mask}
+
+
+def _to_disk(arrays, folder):
+    """Write each array to ``folder`` as ``.npy`` and reopen it memory-mapped.
+
+    Copy-on-write (``mmap_mode="c"``): the maps are writable, so the factories wrap them without copying,
+    and nothing is ever written back to the files.
+    """
+    out = {}
+    for name, array in arrays.items():
+        path = os.path.join(folder, f"{name}.npy")
+        np.save(path, np.ascontiguousarray(array))
+        out[name] = np.load(path, mmap_mode="c")
+    return out
 
 
 def _agreement_score(explainer, x_val, y_val, mask=None):
@@ -147,6 +223,7 @@ def autotune(
     device: Any | None = None,
     n_classes: int | None = None,
     scoring: str = "agreement",
+    cache_dir: str | os.PathLike | bool = True,
     **model_kwargs: Any,
 ) -> AutotuneResult:
     """Search the training hyperparameters and return the best fitted explainer.
@@ -160,13 +237,15 @@ def autotune(
     Args:
         y_outputs: black-box outputs; same semantics as the factories.
         x_inputs: arrays or raw strings / file paths (native ingestion is
-            supported; padding masks are derived automatically).
+            supported; padding masks are derived automatically). Strings /
+            paths are embedded once for all candidates; the final refit
+            embeds them again so the explainer accepts them back.
         modality: ``"auto"`` detects from the input, like :func:`ruleofthumb.fit`.
         search: ``"random"`` samples ``n_candidates`` unique combinations;
             ``"grid"`` enumerates every combination in ``space``.
         n_candidates: number of random-search candidates.
         space: hyperparameter search space; defaults to
-            :data:`DEFAULT_SPACE`. Keys must be a subset of it.
+            the modality's entry in :data:`DEFAULT_SPACES`. Keys must be a subset of it.
         validation_split: fraction of samples held out for scoring.
         scoring: ``"agreement"`` (default) scores candidates by plain
             held-out surrogate-vs-label agreement, running no reveal
@@ -174,12 +253,20 @@ def autotune(
             (the surrogate's predicted-class accuracy at full reveal)
             instead. Reveal-based scoring runs only when named here.
         seed: controls the split, candidate sampling and candidate fits.
+        cache_dir: where the search keeps its train / validation arrays (the
+            embeddings, for raw strings / paths). ``True`` (default) writes
+            them to a temporary folder and reads them back memory-mapped,
+            deleting the folder when the search ends; a path writes them
+            there and keeps the files; ``False`` keeps everything in memory.
         device: forwarded to the factories.
         n_classes: forwarded to the factories; inferred from
             ``len(unique(y_outputs))`` when omitted.
         **model_kwargs: forwarded to the factories for both the candidate
             fits and the final refit (e.g. ``nonlinear``, ``l1_penalty``,
-            ``mask``). Sample-aligned array values (a
+            ``mask``, and ``patience`` / ``min_delta`` / ``check_every`` to
+            plateau-stop every candidate and the refit — fit-to-convergence,
+            ToDo 29; ``patience`` defaults to :data:`TUNE_PATIENCE` here, pass
+            ``patience=None`` to train every epoch). Sample-aligned array values (a
             ``mask`` with one entry per sample) are split alongside ``x`` /
             ``y``; scalars, strings and dicts pass through whole.
 
@@ -192,34 +279,85 @@ def autotune(
         raise ValueError(f"unknown scoring: {scoring!r}; expected one of {sorted(_SCORINGS)}")
     if not 0 < validation_split < 1:
         raise ValueError("validation_split must be in (0, 1)")
-    space = DEFAULT_SPACE if space is None else space
-    unknown = set(space) - set(DEFAULT_SPACE)
-    if unknown:
-        raise ValueError(f"unknown hyperparameters in space: {sorted(unknown)}")
 
+    if model_kwargs.get("patience", "auto") == "auto":  # tuning plateau-stops by default
+        model_kwargs = {**model_kwargs, "patience": TUNE_PATIENCE}
     modality = _resolve_modality(x_inputs, modality)
     factory = _FACTORIES[modality]
-    inputs = list(x_inputs) if _is_string_batch(x_inputs) else np.asarray(x_inputs)
+    default = DEFAULT_SPACES[modality]
+    space = default if space is None else space
+    unknown = set(space) - set(default)
+    if unknown:
+        raise ValueError(f"unknown hyperparameters in space for {modality}: {sorted(unknown)}")
+    if _is_string_batch(x_inputs):
+        inputs, candidate_kwargs = _embed_once(modality, x_inputs, model_kwargs, device)
+    else:
+        inputs, candidate_kwargs = np.asarray(x_inputs), model_kwargs
     labels = np.asarray(y_outputs).flatten()
     if n_classes is None:
         n_classes = len(np.unique(labels))
 
-    train_idx, val_idx = _split(len(inputs), validation_split, seed)
-    x_train, y_train = _subset(inputs, train_idx), labels[train_idx]
-    x_val, y_val = _subset(inputs, val_idx), labels[val_idx]
-    train_kwargs = _split_kwargs(model_kwargs, train_idx, len(inputs))
-    val_mask = _split_value(model_kwargs.get("mask"), val_idx, len(inputs))
+    n = len(inputs)
+    train_idx, val_idx = _split(n, validation_split, seed)
+    y_train, y_val = labels[train_idx], labels[val_idx]
+    folder = None
+    if cache_dir is False:
+        x_train, x_val = _subset(inputs, train_idx), _subset(inputs, val_idx)
+    else:  # the search reads its data from disk, not RAM
+        folder = tempfile.mkdtemp(prefix="rot_autotune_") if cache_dir is True else os.fspath(cache_dir)
+        os.makedirs(folder, exist_ok=True)
+        stored = _to_disk({"x_train": inputs[train_idx], "x_val": inputs[val_idx]}, folder)
+        x_train, x_val = stored["x_train"], stored["x_val"]
+    del inputs  # the embedded / converted copy is not needed past the split
+    train_kwargs = _split_kwargs(candidate_kwargs, train_idx, n)
+    val_mask = _split_value(candidate_kwargs.get("mask"), val_idx, n)
 
-    trials = []
-    for i, params in enumerate(_candidates(space, search, n_candidates, seed)):
-        candidate_seed = None if seed is None else seed + i
-        candidate = factory(
-            y_train, x_train, seed=candidate_seed, device=device, n_classes=n_classes, **train_kwargs, **params
-        )
-        score = _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)
-        trials.append({"params": params, "score": score})
-    trials.sort(key=lambda trial: trial["score"], reverse=True)
+    def evaluate(params, seed_i, epochs=None):
+        """Fit one candidate (optionally at a reduced epoch budget) and score it; OOM is skipped, not fatal."""
+        call = {**train_kwargs, **params}  # searched params win over caller-pinned kwargs; screen epochs win over both
+        if epochs is not None:
+            call["epochs"] = epochs
+        try:  # guard the fit only (where OOM happens); a scoring error is a real bug and propagates
+            candidate = factory(y_train, x_train, tune=None, seed=seed_i, device=device, n_classes=n_classes, **call)
+        except (RuntimeError, MemoryError) as exc:  # an OOM candidate must not kill the search; real bugs still raise
+            if not _is_oom(exc):
+                raise
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            return {"params": params, "score": float("-inf"), "error": repr(exc)}
+        # ponytail: an OOM during scoring (val predict) still propagates; fit is the expensive path
+        return {"params": params, "score": _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)}
+
+    try:
+        trials = _search(evaluate, _candidates(space, search, n_candidates, seed), seed)
+    finally:
+        if cache_dir is True:  # ponytail: on Windows still-mapped files can outlive this; the OS temp dir reclaims them
+            shutil.rmtree(folder, ignore_errors=True)
 
     best = trials[0]
-    explainer = factory(y_outputs, x_inputs, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
+    explainer = factory(y_outputs, x_inputs, tune=None, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
     return AutotuneResult(explainer=explainer, best_params=best["params"], best_score=best["score"], trials=trials)
+
+
+def _search(evaluate, candidates, seed):
+    """Run the candidates (successive halving with 4+), rank them, and return the trials best first."""
+    seeds = [None if seed is None else seed + i for i in range(len(candidates))]
+    if len(candidates) >= 4:
+        # Successive halving (ToDo 29): screen every candidate at ~1/3 of its epochs, then finish only the
+        # better-scoring half at full epochs. Pruned candidates stay in the record with their screen score, but
+        # cannot win: a 1/3-epoch score is not comparable to a full-epoch one.
+        # ponytail: fixed 1/3 rung and top-half keep; a multi-rung schedule only pays off past ~tens of candidates.
+        screen = [evaluate(p, s, epochs=max(1, p.get("epochs", 300) // 3)) for p, s in zip(candidates, seeds)]
+        ranked = sorted(range(len(candidates)), key=lambda j: screen[j]["score"], reverse=True)
+        survivors = set(ranked[: (len(candidates) + 1) // 2])
+        trials = [evaluate(candidates[j], seeds[j]) if j in survivors else {**screen[j], "pruned": True}
+                  for j in range(len(candidates))]
+    else:
+        trials = [evaluate(p, s) for p, s in zip(candidates, seeds)]
+    if all(trial["score"] == float("-inf") for trial in trials if not trial.get("pruned")):
+        raise RuntimeError("every autotune candidate failed; see trial['error'] in the result's .trials")
+    # finished candidates first (only they can win), then best score; ties break toward the cheaper fit
+    # (fewer epochs, then larger batch) for determinism
+    trials.sort(key=lambda trial: (trial.get("pruned", False), -trial["score"], trial["params"].get("epochs", 0),
+                                   -trial["params"].get("batch_size", 0)))
+    return trials

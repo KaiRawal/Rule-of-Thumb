@@ -162,7 +162,13 @@ class RoT(torch.nn.Module):
         mask=None,
         swa_burn_in=None,
         seed=None,
+        patience=None,
+        min_delta=1e-3,
+        check_every=10,
     ):
+        """``patience=None`` runs all ``epochs``. Set it to stop early once train
+        agreement stops improving by ``min_delta`` for ``patience`` checks (every
+        ``check_every`` epochs); ``epochs`` is then the max-epoch cap."""
         if seed is not None:
             torch.manual_seed(seed)
         # Cap the batch at N: identical numerics to the full-batch fallback
@@ -176,6 +182,7 @@ class RoT(torch.nn.Module):
         if mask is not None:
             mask = torch.as_tensor(mask, device=self.device)
         features = points
+        best_agreement, stale, ran = -1.0, 0, epochs
         for e in range(epochs):
             shuff = torch.randperm(classifier_response.shape[0], device=self.device)
             for i in range(points.shape[0] // batch_size + 1):
@@ -203,10 +210,24 @@ class RoT(torch.nn.Module):
             elif e == burn_in:
                 self._set_swa_model(AveragedModel(self))
 
+            if patience is not None and (e + 1) % check_every == 0:
+                agreement = float((self.predict(points, mask=mask) == classifier_response.cpu()).float().mean())
+                if agreement > best_agreement + min_delta:
+                    best_agreement, stale = agreement, 0
+                else:
+                    stale += 1
+                    if stale >= patience:
+                        ran = e + 1
+                        break
+
+        if patience is not None and self.swa_model is None: 
+            self._set_swa_model(AveragedModel(self))
+        self.training_loss = self.training_loss[:ran]
         self.training_loss /= features.shape[0] / batch_size
 
     def fit(
-        self, points, classifier_response, epochs, batch_size, lr=1e-4, pretrain_epochs=5, weight_decay=0.01, seed=None
+        self, points, classifier_response, epochs, batch_size, lr=1e-4, pretrain_epochs=5, weight_decay=0.01, seed=None,
+        patience=None, min_delta=1e-3, check_every=10,
     ):
         assert points.shape[0] == classifier_response.shape[0]
         assert points.shape[1] == self.a.shape[1]
@@ -223,7 +244,8 @@ class RoT(torch.nn.Module):
         self.training_loop(self.loss, points, classifier_response, optimiser, pretrain_epochs, batch_size)
         self.dropout_rate = drop_out
         optimiser = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
-        self.training_loop(self.loss, points, classifier_response, optimiser, epochs, batch_size)
+        self.training_loop(self.loss, points, classifier_response, optimiser, epochs, batch_size,
+                           patience=patience, min_delta=min_delta, check_every=check_every)
 
     def averaged_explainer(self):
         return list(self.swa_model.children())[0]  # noqa: RUF015 (kept verbatim from source)
