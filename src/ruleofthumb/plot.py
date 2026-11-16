@@ -231,6 +231,7 @@ def saliency(
     *,
     power: float = 1.0,
     trim: float = 2.0,
+    interpolation: str | None = "nearest",
     size: tuple[float, float] = (5, 5),
     ax: Any | None = None,
 ):
@@ -245,6 +246,9 @@ def saliency(
         image: optional ``(H, W, 3)`` RGB image to overlay onto.
         power: exponent applied to absolute magnitudes before normalisation.
         trim: percentile used to clip extremes on each side.
+        interpolation: Matplotlib interpolation for the saliency layers.
+            The default ``"nearest"`` preserves exact heatmap pixels;
+            ``"bicubic"`` restores the legacy smoothed rendering.
         size: figure size when creating a new figure.
         ax: optional existing axes to draw into.
     """
@@ -275,7 +279,7 @@ def saliency(
     if image is not None:
         ax.imshow(np.asarray(image), extent=extent)
     for layer, cmap in ((negative, blue), (positive, red)):
-        ax.imshow(layer, cmap=cmap, origin="upper", extent=extent, interpolation="bicubic", vmin=0, vmax=1)
+        ax.imshow(layer, cmap=cmap, origin="upper", extent=extent, interpolation=interpolation, vmin=0, vmax=1)
     ax.axis("off")
     figure.tight_layout(pad=0)
     return figure
