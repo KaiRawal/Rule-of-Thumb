@@ -357,3 +357,49 @@ def test_plateau_stop_reaches_fit_through_factory_and_tune():
                         tune={"search": "grid", "space": {"learning_rate": [0.05], "epochs": [400], "batch_size": [500]}})
     assert tuned.best_params_["epochs"] == 400
     assert len(tuned.model.training_loss) < 400  # refit plateau-stops too
+
+
+def test_tuning_plateau_stops_by_default_and_the_fixed_fit_does_not():
+    x, y = _separable_dataset()
+    tune_opts = {"search": "grid", "space": {"learning_rate": [0.05], "epochs": [400], "batch_size": [500]}}
+    tuned = fit_tabular(y, x, n_classes=2, seed=0, tune=tune_opts)
+    assert len(tuned.model.training_loss) < 400  # patience="auto" -> plateau-stop while tuning
+    off = fit_tabular(y, x, n_classes=2, seed=0, tune=tune_opts, patience=None)
+    assert len(off.model.training_loss) == 400  # patience=None turns it off
+    fixed = fit_tabular(y, x, n_classes=2, seed=0, epochs=400, tune=None)
+    assert len(fixed.model.training_loss) == 400  # the fixed fit still runs every epoch by default
+
+
+def _spy_inputs(monkeypatch):
+    """Record the x each tabular factory call receives (candidates first, the refit last)."""
+    from ruleofthumb import tune
+
+    seen, real = [], tune._FACTORIES["tabular"]
+
+    def spy(y_outputs, x_inputs, **kwargs):
+        seen.append(x_inputs)
+        return real(y_outputs, x_inputs, **kwargs)
+
+    monkeypatch.setitem(tune._FACTORIES, "tabular", spy)
+    return seen
+
+
+def test_search_data_is_on_disk_by_default_and_the_temp_folder_is_removed(monkeypatch):
+    import os
+
+    seen = _spy_inputs(monkeypatch)
+    x, y = _separable_dataset()
+    autotune(y, x, modality="tabular", search="grid", space={"learning_rate": [0.05], "epochs": [20]}, seed=0)
+    assert isinstance(seen[0], np.memmap)  # the candidate trained from a file, not a RAM copy
+    assert not os.path.exists(os.path.dirname(seen[0].filename))  # temporary folder removed after the search
+    assert not isinstance(seen[-1], np.memmap)  # the refit uses the caller's own data
+
+
+def test_cache_dir_false_keeps_memory_and_a_path_keeps_the_files(monkeypatch, tmp_path):
+    seen = _spy_inputs(monkeypatch)
+    x, y = _separable_dataset()
+    space = {"learning_rate": [0.05], "epochs": [20]}
+    autotune(y, x, modality="tabular", search="grid", space=space, seed=0, cache_dir=False)
+    assert not isinstance(seen[0], np.memmap)
+    autotune(y, x, modality="tabular", search="grid", space=space, seed=0, cache_dir=tmp_path)
+    assert (tmp_path / "x_train.npy").exists() and (tmp_path / "x_val.npy").exists()  # a chosen folder is kept

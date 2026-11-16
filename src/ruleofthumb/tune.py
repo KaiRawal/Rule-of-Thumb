@@ -15,6 +15,9 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import os
+import shutil
+import tempfile
 from typing import Any
 
 import numpy as np
@@ -59,6 +62,8 @@ DEFAULT_SPACES = {
 # the undecorated factories: candidates never tune again (recursion guard for ``tune=True``)
 _FACTORIES = {"tabular": fit_tabular, "text": fit_text, "image": fit_image}  # called with tune=None: the recursion guard
 _LOADER_KWARGS = ("tokenizer", "model", "backbone", "size", "transform")
+# plateau-stop patience while tuning when the caller leaves ``patience`` at its default ("auto")
+TUNE_PATIENCE = 3
 
 
 @dataclasses.dataclass(frozen=True)
@@ -166,6 +171,20 @@ def _embed_once(modality, x_inputs, model_kwargs, device):
     return arrays, {**kwargs, "mask": mask}
 
 
+def _to_disk(arrays, folder):
+    """Write each array to ``folder`` as ``.npy`` and reopen it memory-mapped.
+
+    Copy-on-write (``mmap_mode="c"``): the maps are writable, so the factories wrap them without copying,
+    and nothing is ever written back to the files.
+    """
+    out = {}
+    for name, array in arrays.items():
+        path = os.path.join(folder, f"{name}.npy")
+        np.save(path, np.ascontiguousarray(array))
+        out[name] = np.load(path, mmap_mode="c")
+    return out
+
+
 def _agreement_score(explainer, x_val, y_val, mask=None):
     """Plain held-out agreement: surrogate predictions vs black-box labels.
 
@@ -204,6 +223,7 @@ def autotune(
     device: Any | None = None,
     n_classes: int | None = None,
     scoring: str = "agreement",
+    cache_dir: str | os.PathLike | bool = True,
     **model_kwargs: Any,
 ) -> AutotuneResult:
     """Search the training hyperparameters and return the best fitted explainer.
@@ -233,6 +253,11 @@ def autotune(
             (the surrogate's predicted-class accuracy at full reveal)
             instead. Reveal-based scoring runs only when named here.
         seed: controls the split, candidate sampling and candidate fits.
+        cache_dir: where the search keeps its train / validation arrays (the
+            embeddings, for raw strings / paths). ``True`` (default) writes
+            them to a temporary folder and reads them back memory-mapped,
+            deleting the folder when the search ends; a path writes them
+            there and keeps the files; ``False`` keeps everything in memory.
         device: forwarded to the factories.
         n_classes: forwarded to the factories; inferred from
             ``len(unique(y_outputs))`` when omitted.
@@ -240,7 +265,8 @@ def autotune(
             fits and the final refit (e.g. ``nonlinear``, ``l1_penalty``,
             ``mask``, and ``patience`` / ``min_delta`` / ``check_every`` to
             plateau-stop every candidate and the refit — fit-to-convergence,
-            ToDo 29). Sample-aligned array values (a
+            ToDo 29; ``patience`` defaults to :data:`TUNE_PATIENCE` here, pass
+            ``patience=None`` to train every epoch). Sample-aligned array values (a
             ``mask`` with one entry per sample) are split alongside ``x`` /
             ``y``; scalars, strings and dicts pass through whole.
 
@@ -254,6 +280,8 @@ def autotune(
     if not 0 < validation_split < 1:
         raise ValueError("validation_split must be in (0, 1)")
 
+    if model_kwargs.get("patience", "auto") == "auto":  # tuning plateau-stops by default
+        model_kwargs = {**model_kwargs, "patience": TUNE_PATIENCE}
     modality = _resolve_modality(x_inputs, modality)
     factory = _FACTORIES[modality]
     default = DEFAULT_SPACES[modality]
@@ -269,11 +297,20 @@ def autotune(
     if n_classes is None:
         n_classes = len(np.unique(labels))
 
-    train_idx, val_idx = _split(len(inputs), validation_split, seed)
-    x_train, y_train = _subset(inputs, train_idx), labels[train_idx]
-    x_val, y_val = _subset(inputs, val_idx), labels[val_idx]
-    train_kwargs = _split_kwargs(candidate_kwargs, train_idx, len(inputs))
-    val_mask = _split_value(candidate_kwargs.get("mask"), val_idx, len(inputs))
+    n = len(inputs)
+    train_idx, val_idx = _split(n, validation_split, seed)
+    y_train, y_val = labels[train_idx], labels[val_idx]
+    folder = None
+    if cache_dir is False:
+        x_train, x_val = _subset(inputs, train_idx), _subset(inputs, val_idx)
+    else:  # the search reads its data from disk, not RAM
+        folder = tempfile.mkdtemp(prefix="rot_autotune_") if cache_dir is True else os.fspath(cache_dir)
+        os.makedirs(folder, exist_ok=True)
+        stored = _to_disk({"x_train": inputs[train_idx], "x_val": inputs[val_idx]}, folder)
+        x_train, x_val = stored["x_train"], stored["x_val"]
+    del inputs  # the embedded / converted copy is not needed past the split
+    train_kwargs = _split_kwargs(candidate_kwargs, train_idx, n)
+    val_mask = _split_value(candidate_kwargs.get("mask"), val_idx, n)
 
     def evaluate(params, seed_i, epochs=None):
         """Fit one candidate (optionally at a reduced epoch budget) and score it; OOM is skipped, not fatal."""
@@ -291,7 +328,19 @@ def autotune(
         # ponytail: an OOM during scoring (val predict) still propagates; fit is the expensive path
         return {"params": params, "score": _SCORINGS[scoring](candidate, x_val, y_val, mask=val_mask)}
 
-    candidates = _candidates(space, search, n_candidates, seed)
+    try:
+        trials = _search(evaluate, _candidates(space, search, n_candidates, seed), seed)
+    finally:
+        if cache_dir is True:  # ponytail: on Windows still-mapped files can outlive this; the OS temp dir reclaims them
+            shutil.rmtree(folder, ignore_errors=True)
+
+    best = trials[0]
+    explainer = factory(y_outputs, x_inputs, tune=None, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
+    return AutotuneResult(explainer=explainer, best_params=best["params"], best_score=best["score"], trials=trials)
+
+
+def _search(evaluate, candidates, seed):
+    """Run the candidates (successive halving with 4+), rank them, and return the trials best first."""
     seeds = [None if seed is None else seed + i for i in range(len(candidates))]
     if len(candidates) >= 4:
         # Successive halving (ToDo 29): screen every candidate at ~1/3 of its epochs, then finish only the
@@ -311,7 +360,4 @@ def autotune(
     # (fewer epochs, then larger batch) for determinism
     trials.sort(key=lambda trial: (trial.get("pruned", False), -trial["score"], trial["params"].get("epochs", 0),
                                    -trial["params"].get("batch_size", 0)))
-
-    best = trials[0]
-    explainer = factory(y_outputs, x_inputs, tune=None, seed=seed, device=device, n_classes=n_classes, **model_kwargs, **best["params"])
-    return AutotuneResult(explainer=explainer, best_params=best["params"], best_score=best["score"], trials=trials)
+    return trials

@@ -432,7 +432,7 @@ def load_explainer(path: str | os.PathLike, *, device: Any | None = None) -> Exp
     return explainer
 
 
-_TUNE_OPTIONS = frozenset({"space", "n_candidates", "scoring", "search", "validation_split"})
+_TUNE_OPTIONS = frozenset({"space", "n_candidates", "scoring", "search", "validation_split", "cache_dir"})
 
 
 def _dispatch_tune(modality, tune, y_outputs, x_inputs, passthrough):
@@ -503,7 +503,7 @@ def fit_tabular(
     n_classes=2,
     device=None,
     nonlinear=None,
-    patience=None,
+    patience="auto",
     min_delta=1e-3,
     check_every=10,
     tune=True,
@@ -514,10 +514,12 @@ def fit_tabular(
     :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit
     with the arguments as given; a dict overrides the autotune options.
 
-    ``patience`` (default ``None`` = off) enables plateau-stop: training ends
+    ``patience`` enables plateau-stop: training ends
     once train agreement stops improving by ``min_delta`` for ``patience``
     checks (every ``check_every`` epochs), with ``epochs`` as the max cap. It
-    composes with ``tune`` (each candidate and the refit plateau-stop).
+    composes with ``tune`` (each candidate and the refit plateau-stop). The
+    default ``"auto"`` plateau-stops with ``patience=3`` while tuning and runs
+    every epoch on the fixed fit; ``None`` turns it off, an int sets it.
     """
     if tune is not None and tune is not False:
         return _dispatch_tune("tabular", tune, y_outputs, x_inputs,
@@ -536,7 +538,7 @@ def fit_tabular(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
-        patience=patience,
+        patience=None if patience == "auto" else patience,  # "auto": plateau-stop only while tuning
         min_delta=min_delta,
         check_every=check_every,
     )
@@ -560,7 +562,7 @@ def fit_text(
     n_classes=2,
     device=None,
     nonlinear=None,
-    patience=None,
+    patience="auto",
     min_delta=1e-3,
     check_every=10,
     tune=True,
@@ -584,8 +586,8 @@ def fit_text(
 
     ``tune=True`` (the default) searches the hyperparameters via
     :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
-    ``patience`` (default ``None`` = off) enables plateau-stop (see
-    :func:`fit_tabular`); it composes with ``tune``.
+    ``patience`` enables plateau-stop (default ``"auto"``: on while tuning,
+    off for the fixed fit; see :func:`fit_tabular`).
     """
     if tune is not None and tune is not False:
         return _dispatch_tune("text", tune, y_outputs, x_inputs,
@@ -620,7 +622,7 @@ def fit_text(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
-        patience=patience,
+        patience=None if patience == "auto" else patience,  # "auto": plateau-stop only while tuning
         min_delta=min_delta,
         check_every=check_every,
     )
@@ -658,7 +660,7 @@ def fit_image(
     n_classes=2,
     device=None,
     nonlinear=None,
-    patience=None,
+    patience="auto",
     min_delta=1e-3,
     check_every=10,
     tune=True,
@@ -690,8 +692,8 @@ def fit_image(
 
     ``tune=True`` (the default) searches the hyperparameters via
     :func:`ruleofthumb.autotune`; ``tune=None`` / ``False`` runs the fixed fit.
-    ``patience`` (default ``None`` = off) enables plateau-stop (see
-    :func:`fit_tabular`); it composes with ``tune``.
+    ``patience`` enables plateau-stop (default ``"auto"``: on while tuning,
+    off for the fixed fit; see :func:`fit_tabular`).
     """
     if tune is not None and tune is not False:
         return _dispatch_tune("image", tune, y_outputs, x_inputs,
@@ -724,7 +726,7 @@ def fit_image(
         pretrain_epochs=pretrain_epochs,
         weight_decay=weight_decay,
         seed=seed,
-        patience=patience,
+        patience=None if patience == "auto" else patience,  # "auto": plateau-stop only while tuning
         min_delta=min_delta,
         check_every=check_every,
     )
