@@ -97,6 +97,18 @@ def test_saliency_returns_figure_with_and_without_image():
     assert isinstance(plot.saliency(heat, image=image), Figure)
 
 
+def test_saliency_preserves_exact_pixels_by_default():
+    fig = plot.saliency(np.arange(64, dtype=np.float32).reshape(8, 8) - 32)
+    assert {layer.get_interpolation() for layer in fig.axes[0].images} == {"nearest"}
+    plt.close(fig)
+
+
+def test_saliency_accepts_custom_interpolation():
+    fig = plot.saliency(np.arange(64, dtype=np.float32).reshape(8, 8) - 32, interpolation="bicubic")
+    assert {layer.get_interpolation() for layer in fig.axes[0].images} == {"bicubic"}
+    plt.close(fig)
+
+
 def test_saliency_rejects_nonpositive_power():
     with pytest.raises(ValueError, match="power"):
         plot.saliency(np.ones((4, 4)), power=0.0)
