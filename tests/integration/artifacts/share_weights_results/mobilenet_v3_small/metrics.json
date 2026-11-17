@@ -1,0 +1,41 @@
+{
+  "backbone": "mobilenet_v3_small",
+  "label": "mobilenet_v3_small frozen trunk",
+  "device": "cuda",
+  "feature_shape": [
+    1797,
+    576,
+    7,
+    7
+  ],
+  "n_train": 1437,
+  "n_test": 360,
+  "majority_baseline": 0.10239287701725097,
+  "feature_extraction_secs": 3.3,
+  "modes": {
+    "shared": {
+      "a_shape": [
+        10,
+        576
+      ],
+      "parameters": 11530,
+      "train_fidelity": 1.0,
+      "test_fidelity": 0.9694,
+      "generalisation_gap": 0.0306,
+      "fit_secs": 10.5
+    },
+    "unshared": {
+      "a_shape": [
+        10,
+        576,
+        7,
+        7
+      ],
+      "parameters": 564490,
+      "train_fidelity": 1.0,
+      "test_fidelity": 0.9917,
+      "generalisation_gap": 0.0083,
+      "fit_secs": 14.8
+    }
+  }
+}

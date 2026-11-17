@@ -285,6 +285,8 @@ class Explainer:
             "sample_shape": [int(s) for s in model.sample_shape],
             "use_BCE_loss": bool(model.use_BCE_loss),
         }
+        if self._modality in ("text", "image"):
+            config["share_weights"] = bool(model.share_weights)
         if self._modality == "text":
             config["l1_penalty"] = float(model.l1_penalty)
         if self._modality == "image":
@@ -435,6 +437,7 @@ def fit_text(
     n_classes=2,
     device=None,
     nonlinear=None,
+    share_weights=True,
 ):
     """Fit a text :class:`Explainer` on ``(N, tokens, embedding)`` inputs or raw strings.
 
@@ -470,6 +473,7 @@ def fit_text(
         l1_penalty=l1_penalty,
         device=device,
         nonlinear=nonlinear,
+        share_weights=share_weights,
     )
     rot.fit(
         _as_float_inputs(x_inputs),
@@ -505,6 +509,7 @@ def fit_image(
     n_classes=2,
     device=None,
     nonlinear=None,
+    share_weights=True,
 ):
     """Fit an image :class:`Explainer` on ``(N, C, H, W)`` inputs or image file paths.
 
@@ -553,7 +558,8 @@ def fit_image(
     elif mask is not None:
         mask = torch.as_tensor(np.asarray(mask)).to(torch.bool)
     _warn_if_oversized_batch(batch_size, x_inputs.shape[0])
-    rot = RoTImage(n_classes, (x_inputs.shape[1],), device=device, nonlinear=nonlinear)
+    sample_shape = (x_inputs.shape[1],) if share_weights else tuple(x_inputs.shape[1:])
+    rot = RoTImage(n_classes, sample_shape, device=device, nonlinear=nonlinear, share_weights=share_weights)
     rot.fit(
         _as_float_inputs(x_inputs),
         _check_label_range(_as_labels(y_outputs), n_classes),
