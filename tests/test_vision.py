@@ -54,7 +54,7 @@ def test_fit_image_stub_backbone_end_to_end(map_png_paths):
     from ruleofthumb import fit_image
 
     y = np.array([0, 1])
-    exp = fit_image(y, map_png_paths, backbone=_StubBackbone(), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit_image(y, map_png_paths, backbone=_StubBackbone(), epochs=2, batch_size=2, learning_rate=0.05, tune=None)
     assert exp.backbone is None  # custom modules record no id
     imp = exp.get_explanation(map_png_paths)
     assert imp.shape == (2, 2, 3)
@@ -64,7 +64,7 @@ def test_fit_image_backbone_none_keeps_pixels(map_png_paths):
     from ruleofthumb import fit_image
 
     y = np.array([0, 1])
-    exp = fit_image(y, map_png_paths, backbone=None, epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit_image(y, map_png_paths, backbone=None, epochs=2, batch_size=2, learning_rate=0.05, tune=None)
     assert exp.backbone is None
     assert exp.get_explanation(map_png_paths).shape == (2, 16, 20)
 
@@ -74,7 +74,7 @@ def test_backbone_transform_conflict_rejected(map_png_paths):
 
     with pytest.raises(ValueError, match="transform"):
         fit_image(
-            np.array([0, 1]), map_png_paths, backbone=_StubBackbone(), transform=lambda pil: pil, epochs=1
+            np.array([0, 1]), map_png_paths, backbone=_StubBackbone(), transform=lambda pil: pil, epochs=1, tune=None
         )
 
 
@@ -83,7 +83,7 @@ def test_save_load_preserves_backbone_id(map_png_paths, tmp_path):
     from ruleofthumb.vision import embed_images
 
     y = np.array([0, 1])
-    exp = fit_image(y, map_png_paths, backbone=_StubBackbone(), epochs=2, batch_size=2, learning_rate=0.05)
+    exp = fit_image(y, map_png_paths, backbone=_StubBackbone(), epochs=2, batch_size=2, learning_rate=0.05, tune=None)
     path = tmp_path / "maps.rotx"
     exp.save(str(path))
     loaded = load_explainer(str(path))

@@ -9,7 +9,7 @@ the task that matches yours below.
 
 | Symbol | What it does for you |
 |---|---|
-| `fit` | Reads the shape of your inputs, picks the modality, and fits |
+| `fit` | Reads the shape of your inputs, picks the modality, searches the settings (`tune=True`) and fits |
 | `fit_tabular` | Fits on tables shaped `[N, columns]` |
 | `fit_text` | Fits on sentences — raw strings or `[N, tokens, dim]` plus a mask |
 | `fit_image` | Fits on pictures — file paths or `[N, C, H, W]` plus a mask |
@@ -34,7 +34,7 @@ the task that matches yours below.
 
 ```{eval-rst}
 .. autoclass:: ruleofthumb.Explainer
-   :members: get_explanation, get_order, ordered_predict, score_ordering, score, predict, save
+   :members: get_explanation, get_order, ordered_predict, score_ordering, score, predict, evaluate, save
 ```
 
 ```{eval-rst}
@@ -56,12 +56,17 @@ fitted, everything you can ask lives here:
   uncovering in rank order, and `score_ordering(inputs, answers,
   order)` turns that replay into accuracy per step.
 - `score` and `predict` simply report the stand-in's own answers.
+- `evaluate(inputs, answers)` measures agreement on data you choose,
+  optionally with the reveal gap and a rationale comparison.
+
+A tuned explainer also carries `best_params_` (the settings the search
+picked) and `best_score_` (their held-out agreement).
 
 ## Tuning, and getting data in
 
 | Symbol | What it does for you |
 |---|---|
-| `autotune` / `AutotuneResult` | Searches the settings for you, then refits the winner on all data |
+| `autotune` / `AutotuneResult` | The search behind `tune=True`, with the full record of every candidate |
 | `embed_texts` / `TextEmbeddings` | Turns strings into embeddings, a mask, and decoded tokens |
 | `load_images` / `ImageBatch` | Turns files into pixels alongside a validity mask |
 | `embed_images` / `ImageEmbeddings` | Turns files into backbone maps alongside a mask |
