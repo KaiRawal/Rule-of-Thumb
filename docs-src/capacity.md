@@ -71,12 +71,21 @@ exp = rot.fit_image(binary, images, mask=mask)
 
 Two settings inside training decide what an explanation means.
 
-**Dropout.** During training, half of each example is hidden at
-random, a different half each time. The stand-in has to guess the
-model's answer from the half it can see. This is how it learns what
-each feature, word or pixel adds on its own. Whole parts are hidden at
-once: a full word, or a pixel with all its colour channels.
-Explanations later reveal parts the same way.
+**Dropout.** During training, half of each example is hidden at random. 
+
+Dropout hides whole parts: a whole feature, a whole word (all its
+embedding numbers together) or a whole pixel (all its channels
+together).The old research code sometimes hid each number inside a word or pixel
+separately. We tested both ways (3 seeds each, agreement on
+held-out data):
+
+| Data | Hide whole parts (package) | Hide each number separately (old code) |
+|---|---|---|
+| Images (MobileNet digit maps) | 0.936 | 0.945 |
+| Text (SST-2 sentences) | 0.997 | 0.997 |
+
+The image gap is within seed-to-seed noise (single seeds range from
+0.929 to 0.958), and text is identical, so the package keeps whole parts.
 
 **The offset (`b`).** Every feature is measured from a starting point,
 its offset. An explanation tells you how much a value moves the answer
