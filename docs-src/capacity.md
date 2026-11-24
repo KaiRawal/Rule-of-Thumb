@@ -67,6 +67,45 @@ binary = (black_box_answers == 283).astype(np.int64)  # Persian-cat-vs-rest
 exp = rot.fit_image(binary, images, mask=mask)
 ```
 
+## What shapes an explanation: dropout and the offset
+
+Two settings inside training decide what an explanation means.
+
+**Dropout.** During training, half of each example is hidden at random. 
+
+Dropout hides whole parts: a whole feature, a whole word (all its
+embedding numbers together) or a whole pixel (all its channels
+together).The old research code sometimes hid each number inside a word or pixel
+separately. We tested both ways (3 seeds each, agreement on
+held-out data):
+
+| Data | Hide whole parts (package) | Hide each number separately (old code) |
+|---|---|---|
+| Images (MobileNet digit maps) | 0.936 | 0.945 |
+| Text (SST-2 sentences) | 0.997 | 0.997 |
+
+The image gap is within seed-to-seed noise (single seeds range from
+0.929 to 0.958), and text is identical, so the package keeps whole parts.
+
+**The offset (`b`).** Every feature is measured from a starting point,
+its offset. An explanation tells you how much a value moves the answer
+by being above or below that point. For tabular data and images the
+starting point is the feature's average, so an ordinary value adds
+roughly nothing. For text it is zero. Training then adjusts it.
+
+**What happens if you change them.** We retrained on the research
+experiments three ways: dropout off, offset fixed at zero, and both.
+
+| Change | Tabular data | Text | Images |
+|---|---|---|---|
+| Dropout off | Matches the model a little better, but the explanations go wrong: features swap places and one feature takes over | Small, mixed change | Almost no change |
+| Offset fixed at zero | On raw numbers (age in years, price in dollars) it matches the model much worse; on standardised numbers almost no change | No change, or slightly better | No change, or slightly better |
+| Both | Explanations go wrong as with dropout off, and the base score is far off | In between | Worst result: matches the model and ranks pixels less well |
+
+**In short:** keep dropout on (the package fixes it at one half for
+this reason). If your tabular features use very different scales,
+standardise them before fitting.
+
 ## Faithful is not the same as plausible
 
 It helps to keep two judgements apart. RoT reproduces *the model's
