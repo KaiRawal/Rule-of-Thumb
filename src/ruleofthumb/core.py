@@ -171,10 +171,10 @@ class RoT(torch.nn.Module):
         batch_size = min(batch_size, points.shape[0])
         self.training_loss = np.zeros(epochs)
         burn_in = epochs // 10 + 1 if swa_burn_in is None else swa_burn_in
-        points = torch.as_tensor(points, device=self.device)
+        points = torch.as_tensor(points)  # left where it is (text: host); each batch goes to the device
         classifier_response = torch.as_tensor(classifier_response, device=self.device)
         if mask is not None:
-            mask = torch.as_tensor(mask, device=self.device)
+            mask = torch.as_tensor(mask)
         features = points
         for e in range(epochs):
             shuff = torch.randperm(classifier_response.shape[0], device=self.device)
@@ -186,8 +186,9 @@ class RoT(torch.nn.Module):
 
                 shuff_inner = shuff[lower:upper]
                 target = classifier_response[shuff_inner]
-                features = points[shuff_inner]
-                mask_inner = mask[shuff_inner] if mask is not None else None
+                rows = shuff_inner.to(points.device)
+                features = points[rows].to(self.device)
+                mask_inner = mask[rows].to(self.device) if mask is not None else None
 
                 l = loss(features, target, mask=mask_inner)
                 l /= batch_size
