@@ -66,6 +66,28 @@ def _decode_tokens(tokenizer, input_ids):
     return [tokenizer.convert_tokens_to_string([t]).strip() for t in tokenizer.convert_ids_to_tokens(input_ids)]
 
 
+def _embed_strided(tokenizer, model, text, window, stride, device):
+    """Embed one text in overlapping windows; returns ``(embeddings, input_ids)`` in the usual layout.
+
+    Each window holds ``window`` text tokens wrapped once in the special tokens. A text token keeps its row
+    from the first window that contains it; the leading / trailing special tokens come from the first / last window.
+    """
+    ids = tokenizer(text, add_special_tokens=False, truncation=False)["input_ids"]
+    front = tokenizer.build_inputs_with_special_tokens([-1]).index(-1)  # special tokens before the text
+    parts, done = [], 0
+    for start in range(0, max(len(ids), 1), stride):
+        chunk = ids[start : start + window]
+        inputs = torch.tensor([tokenizer.build_inputs_with_special_tokens(chunk)], device=device)
+        with torch.no_grad():
+            hidden = model(input_ids=inputs, attention_mask=torch.ones_like(inputs)).last_hidden_state[0].cpu()
+        last = start + len(chunk) == len(ids)
+        parts.append(hidden[0 if start == 0 else front + done - start : None if last else front + len(chunk)])
+        done = start + len(chunk)
+        if last:
+            break
+    return torch.cat(parts), tokenizer.build_inputs_with_special_tokens(ids)
+
+
 def embed_texts(
     texts: Sequence[str],
     model_name: str = DEFAULT_TEXT_MODEL,
@@ -74,6 +96,7 @@ def embed_texts(
     tokenizer: Any | None = None,
     model: Any | None = None,
     max_length: int | None = None,
+    stride: int | None = None,
     batch_size: int = 32,
     device: Any | None = None,
 ) -> TextEmbeddings:
@@ -91,6 +114,15 @@ def embed_texts(
         model: optional pre-loaded ``AutoModel`` in eval mode (it is put into
             eval mode here regardless).
         max_length: optional truncation length forwarded to the tokeniser.
+            With ``stride`` it is instead the model's window size (special
+            tokens included, e.g. 512), and nothing is truncated.
+        stride: embed long texts in overlapping windows instead of truncating
+            them. Windows hold ``max_length`` minus the special tokens and start
+            ``stride`` tokens apart; each token keeps its embedding from the
+            first window that contains it. Legacy Judicial recipe:
+            ``max_length=512, stride=410`` (RoBERTa: 510-token windows, overlap
+            100), minus its doubled ``<s>`` / ``</s>``. Requires ``max_length``;
+            ``batch_size`` is ignored.
         batch_size: number of texts encoded per forward pass.
         device: torch device for the forward pass; ``None`` auto-detects
             cuda > mps > cpu. Outputs are always returned on CPU.
@@ -104,6 +136,12 @@ def embed_texts(
     if batch_size < 1:
         raise ValueError("batch_size must be >= 1")
     tokenizer, model = _resolve_tokenizer_model(tokenizer, model, model_name, revision)
+    if stride is not None:
+        if max_length is None:
+            raise ValueError("stride= needs max_length=, the model's window size (e.g. 512)")
+        window = max_length - tokenizer.num_special_tokens_to_add()
+        if not 0 < stride <= window:
+            raise ValueError(f"stride must be in 1..{window} (the window without special tokens), got {stride}")
     device = _resolve_device(device)
     model = model.to(device).eval()
 
@@ -112,14 +150,21 @@ def embed_texts(
         encode_kwargs["max_length"] = max_length
 
     chunk_masks, chunk_embeddings, chunk_tokens = [], [], []
-    for start in range(0, len(texts), batch_size):
-        encoded = tokenizer(texts[start : start + batch_size], **encode_kwargs)
-        encoded = {k: v.to(device) for k, v in encoded.items()}
-        with torch.no_grad():
-            hidden = model(**encoded).last_hidden_state
-        chunk_masks.append(encoded["attention_mask"].cpu())
-        chunk_embeddings.append(hidden.cpu())
-        chunk_tokens.extend(_decode_tokens(tokenizer, ids.tolist()) for ids in encoded["input_ids"].cpu())
+    if stride is not None:
+        for text in texts:
+            hidden, ids = _embed_strided(tokenizer, model, text, window, stride, device)
+            chunk_masks.append(torch.ones(1, len(ids), dtype=torch.long))
+            chunk_embeddings.append(hidden[None])
+            chunk_tokens.append(_decode_tokens(tokenizer, ids))
+    else:
+        for start in range(0, len(texts), batch_size):
+            encoded = tokenizer(texts[start : start + batch_size], **encode_kwargs)
+            encoded = {k: v.to(device) for k, v in encoded.items()}
+            with torch.no_grad():
+                hidden = model(**encoded).last_hidden_state
+            chunk_masks.append(encoded["attention_mask"].cpu())
+            chunk_embeddings.append(hidden.cpu())
+            chunk_tokens.extend(_decode_tokens(tokenizer, ids.tolist()) for ids in encoded["input_ids"].cpu())
 
     n = len(texts)
     max_len = int(max(chunk.shape[1] for chunk in chunk_embeddings))

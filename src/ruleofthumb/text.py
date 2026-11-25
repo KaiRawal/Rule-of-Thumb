@@ -73,9 +73,9 @@ class RoTText(RoT):
         fills the full tensor chunk by chunk.
         """
         sample_chunk, class_chunk = _resolve_chunks(sample_chunk, class_chunk)
-        points = torch.as_tensor(points, device=self.device)
+        points = torch.as_tensor(points)  # left where it is; one chunk at a time goes to the device
         if mask is not None:
-            mask = torch.as_tensor(mask, device=self.device)
+            mask = torch.as_tensor(mask)
         n, tokens = points.shape[0], points.shape[1]
         if granularity == "unit":
             out_shape = (n, self.classes, tokens)
@@ -87,8 +87,8 @@ class RoTText(RoT):
         out = torch.zeros(out_shape, dtype=torch.float32, device=self.device)
         with torch.no_grad():
             for s in range(0, n, sample_chunk):
-                resp = self._respond(points[s : s + sample_chunk])
-                mm = None if mask is None else mask[s : s + sample_chunk].to(torch.float32)
+                resp = self._respond(points[s : s + sample_chunk].to(self.device))
+                mm = None if mask is None else mask[s : s + sample_chunk].to(self.device, torch.float32)
                 for k in range(0, self.classes, class_chunk):
                     a = self.a[k : k + class_chunk]
                     b = self.b[k : k + class_chunk]
@@ -115,16 +115,14 @@ class RoTText(RoT):
         return mask[:, None, :, None].to(imp.dtype) * imp
 
     def stochastic_importance(self, points, mask=None):
+        return self._token_keep(points, mask)[:, None, :, None] * self.importance(points, mask=mask)
+
+    def _token_keep(self, points, mask):
+        """One keep/drop draw per token ``(N, T)``, zero on padding."""
+        keep = (torch.rand(points.shape[0], points.shape[1], device=self.device) > self.dropout_rate).float()
         if mask is not None:
-            mask = torch.as_tensor(mask, device=self.device)
-        imp = self.importance(points, mask=mask)
-        token_dim = 1
-        keep = (
-            torch.rand(points.shape[0], points.shape[token_dim], device=self.device) > self.dropout_rate
-        ).float()
-        if mask is not None:
-            keep = keep * mask.to(keep.dtype)
-        return keep[:, None, :, None] * imp
+            keep = keep * torch.as_tensor(mask, device=self.device).to(keep.dtype)
+        return keep
 
     def score(self, points, mask=None, *, sample_chunk=None, class_chunk=None):
         """Length-normalised class scores on the host: always CPU."""
@@ -144,8 +142,12 @@ class RoTText(RoT):
         return score.cpu()
 
     def loss(self, points, target, mask=None):
-        response = self.stochastic_importance(points, mask=mask)
-        response = response.reshape(points.shape[0], self.classes, -1).sum(-1)
+        # = stochastic_importance summed over tokens and dims, without the (N, K, T, E) tensor:
+        #   sum_t keep_t sum_e a_ke (x_te + b_ke) = sum_e a_ke (sum_t keep_t x_te) + (sum_t keep_t) sum_e a_ke b_ke
+        points = torch.as_tensor(points, device=self.device)
+        keep = self._token_keep(points, mask)
+        kept = torch.einsum("nt,nte->ne", keep, self._respond(points))
+        response = kept @ self.a.T + keep.sum(1, keepdim=True) * (self.a * self.b).sum(1)[None]
         response = response + self.g[None]
         base_loss = self.objective(response, target)
 
@@ -175,11 +177,9 @@ class RoTText(RoT):
     ):
         # Unlike the tabular ``RoT.fit``: no projection of ``b`` onto the data
         # range, zero initialisation instead of mean-centering, as in the
-        # original text-experiment copies.
-        points = torch.as_tensor(points, device=self.device)
+        # original text-experiment copies. The data is not moved to the device:
+        # training_loop sends one batch at a time.
         classifier_response = torch.as_tensor(classifier_response, device=self.device)
-        if mask is not None:
-            mask = torch.as_tensor(mask, device=self.device)
         if seed is not None:
             torch.manual_seed(seed)
         with torch.no_grad():
